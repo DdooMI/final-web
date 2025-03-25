@@ -242,8 +242,8 @@ function DesignerRequestsPage() {
                       {selectedRequest.budget}
                     </div>
                     <div>
-                      <span className="text-gray-500">Deadline:</span>{" "}
-                      {selectedRequest.deadline}
+                      <span className="text-gray-500">Duration:</span>{" "}
+                      {selectedRequest.duration} days
                     </div>
                     <div>
                       <span className="text-gray-500">Room Type:</span>{" "}

@@ -1,64 +1,107 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useLocation } from "react-router-dom";
+import { getUserMessages, sendMessage } from "../firebase/messages";
+import { formatDistanceToNow } from "date-fns";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebaseConfig";
 
 function MessagesPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("inbox");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [userProfiles, setUserProfiles] = useState({});
+  const location = useLocation();
 
   // Redirect if not logged in
   if (!user) {
     return <Navigate to="/login" />;
   }
 
-  // Sample messages data - in a real app, this would come from a database
-  const messages = [
-    {
-      id: 1,
-      sender: "Designer Sarah",
-      avatar: "/person.gif",
-      content:
-        "I've completed the initial design for your living room. Would you like to schedule a call to discuss it?",
-      timestamp: "2 hours ago",
-      read: false,
-    },
-    {
-      id: 2,
-      sender: "Designer Michael",
-      avatar: "/person.gif",
-      content:
-        "Here's the updated kitchen design as requested. Let me know your thoughts!",
-      timestamp: "Yesterday",
-      read: true,
-    },
-    {
-      id: 3,
-      sender: "Designer Emma",
-      avatar: "/person.gif",
-      content:
-        "Would you like to schedule a call to discuss your bedroom design?",
-      timestamp: "2 days ago",
-      read: true,
-    },
-    {
-      id: 4,
-      sender: "Designer John",
-      avatar: "/person.gif",
-      content:
-        "I've sent you some material samples for your consideration. Please let me know which ones you prefer.",
-      timestamp: "3 days ago",
-      read: true,
-    },
-    {
-      id: 5,
-      sender: "Designer Lisa",
-      avatar: "/person.gif",
-      content:
-        "Your project timeline has been updated. Please review the new milestones.",
-      timestamp: "1 week ago",
-      read: true,
-    },
-  ];
+  // Check for query parameters (for new message creation)
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const recipientId = queryParams.get('recipient');
+    const subject = queryParams.get('subject');
+    const requestId = queryParams.get('requestId');
+    
+    // If we have recipient and subject, create a new message
+    if (recipientId && subject && user) {
+      const createNewMessage = async () => {
+        try {
+          // Create a new message
+          await sendMessage({
+            senderId: user.uid,
+            recipientId,
+            content: `Hello, I'd like to discuss my design request with you.`,
+            subject,
+          });
+          
+          // Reload messages
+          fetchMessages();
+          
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, "/messages");
+        } catch (err) {
+          console.error("Error creating new message:", err);
+          setError("Failed to create new message. Please try again.");
+        }
+      };
+      
+      createNewMessage();
+    }
+  }, [location.search, user]);
+
+  // Fetch messages from Firebase
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      const messagesData = await getUserMessages(user.uid);
+      
+      // Get user profiles for all message senders/recipients
+      const profiles = {};
+      const userIds = new Set();
+      
+      messagesData.forEach(message => {
+        const otherUserId = message.isSender ? message.recipientId : message.senderId;
+        userIds.add(otherUserId);
+      });
+      
+      // Fetch profiles for all users
+      for (const userId of userIds) {
+        try {
+          const profileRef = collection(db, "users", userId, "profile");
+          const profileSnap = await getDocs(profileRef);
+          
+          if (!profileSnap.empty) {
+            profiles[userId] = profileSnap.docs[0].data();
+          } else {
+            // Default profile if not found
+            profiles[userId] = { name: "User", photoURL: "/person.gif" };
+          }
+        } catch (err) {
+          console.error(`Error fetching profile for user ${userId}:`, err);
+          profiles[userId] = { name: "User", photoURL: "/person.gif" };
+        }
+      }
+      
+      setUserProfiles(profiles);
+      setMessages(messagesData);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      setError("Failed to load messages. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchMessages();
+    }
+  }, [user]);
 
   // Filter messages based on active tab
   const filteredMessages = messages.filter((message) => {

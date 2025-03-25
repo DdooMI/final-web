@@ -168,17 +168,21 @@ function NotificationsPage() {
                   className={`p-4 hover:bg-gray-50 transition-colors duration-150 cursor-pointer ${
                     !notification.read ? "bg-[#C19A6B]/5" : ""
                   }`}
-                  onClick={() => {
-                    // Mark notification as read
-                    if (!notification.read) {
-                      const notificationRef = doc(db, "notifications", notification.id);
-                      updateDoc(notificationRef, { read: true });
-                    }
-                    
-                    // Navigate to the appropriate page based on notification type and related ID
-                    if (notification.relatedId) {
-                      // If it's a design request related notification, navigate to client requests page
-                      window.location.href = `/client-requests?requestId=${notification.relatedId}`;
+                  onClick={async () => {
+                    try {
+                      // Mark notification as read
+                      if (!notification.read) {
+                        const notificationRef = doc(db, "notifications", notification.id);
+                        await updateDoc(notificationRef, { read: true });
+                      }
+                      
+                      // Navigate to the appropriate page based on notification type and related ID
+                      if (notification.relatedId) {
+                        // If it's a design request related notification, navigate to client requests page
+                        window.location.href = `/client-requests?requestId=${notification.relatedId}`;
+                      }
+                    } catch (error) {
+                      console.error("Error updating notification status:", error);
                     }
                   }}
                 >

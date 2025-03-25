@@ -291,7 +291,12 @@ function ClientRequestsPage() {
                           <button
                             className="px-3 py-1.5 border border-[#C19A6B] text-[#C19A6B] rounded hover:bg-[#C19A6B]/5 transition"
                             onClick={() => {
-                              // Future functionality: Message designer
+                              // Navigate to MessagesPage with designer ID to create a new message
+                              const designerId = proposal.designerId;
+                              // Create a subject for the message
+                              const subject = `Regarding: ${selectedRequest.title}`;
+                              // Navigate to messages page with query parameters
+                              window.location.href = `/messages?recipient=${designerId}&subject=${encodeURIComponent(subject)}&requestId=${selectedRequest.id}`;
                             }}
                           >
                             Message Designer

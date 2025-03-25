@@ -12,6 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
+import { formatDistanceToNow } from "date-fns";
 
 function DesignerProposalsPage() {
   const { user, role } = useAuth();
@@ -23,6 +24,7 @@ function DesignerProposalsPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [clientNames, setClientNames] = useState({});
 
   useEffect(() => {
     const fetchProposals = async () => {
@@ -40,8 +42,9 @@ function DesignerProposalsPage() {
             id: doc.id,
             ...doc.data(),
             createdAt:
-              doc.data().createdAt?.toDate().toLocaleDateString() ||
-              "Unknown date",
+              doc.data().createdAt
+                ? formatDistanceToNow(doc.data().createdAt.toDate(), { addSuffix: true })
+                : "Unknown date",
           });
         });
 
@@ -59,14 +62,35 @@ function DesignerProposalsPage() {
               requestDetailsData[proposal.requestId] = {
                 ...requestData,
                 createdAt:
-                  requestData.createdAt?.toDate().toLocaleDateString() ||
-                  "Unknown date",
+                  requestData.createdAt
+                    ? formatDistanceToNow(requestData.createdAt.toDate(), { addSuffix: true })
+                    : "Unknown date",
               };
             }
           }
         }
 
         setRequestDetails(requestDetailsData);
+
+        // Get client names for each proposal
+        const clientIds = proposalsData.map(proposal => proposal.clientId).filter(Boolean);
+        const uniqueClientIds = [...new Set(clientIds)];
+        const clientNamesData = {};
+
+        for (const clientId of uniqueClientIds) {
+          // Get client's profile info
+          const profileRef = collection(db, "users", clientId, "profile");
+          const profileSnap = await getDocs(profileRef);
+          let clientName = "Client";
+
+          if (!profileSnap.empty) {
+            clientName = profileSnap.docs[0].data().name || "Client";
+          }
+
+          clientNamesData[clientId] = clientName;
+        }
+
+        setClientNames(clientNamesData);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -151,51 +175,46 @@ function DesignerProposalsPage() {
 
           <div className="flex space-x-2">
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition ${
-                activeFilter === "all"
+              className={`px-3 py-1.5 text-sm rounded-full transition ${activeFilter === "all"
                   ? "bg-[#C19A6B] text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveFilter("all")}
             >
               All
             </button>
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition ${
-                activeFilter === "pending"
+              className={`px-3 py-1.5 text-sm rounded-full transition ${activeFilter === "pending"
                   ? "bg-[#C19A6B] text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveFilter("pending")}
             >
               Pending
             </button>
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition ${
-                activeFilter === "accepted"
+              className={`px-3 py-1.5 text-sm rounded-full transition ${activeFilter === "accepted"
                   ? "bg-[#C19A6B] text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveFilter("accepted")}
             >
               Accepted
             </button>
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition ${
-                activeFilter === "rejected"
+              className={`px-3 py-1.5 text-sm rounded-full transition ${activeFilter === "rejected"
                   ? "bg-[#C19A6B] text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveFilter("rejected")}
             >
               Rejected
             </button>
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition ${
-                activeFilter === "completed"
+              className={`px-3 py-1.5 text-sm rounded-full transition ${activeFilter === "completed"
                   ? "bg-[#C19A6B] text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
               onClick={() => setActiveFilter("completed")}
             >
               Completed
@@ -263,16 +282,15 @@ function DesignerProposalsPage() {
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 Your Proposals {activeFilter !== "all" && `(${activeFilter})`}
               </h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 p-2">
                 {filteredProposals.map((proposal) => (
                   <motion.div
                     key={proposal.id}
                     whileHover={{ scale: 1.02 }}
-                    className={`border rounded-lg p-4 cursor-pointer transition hover:border-[#C19A6B] ${
-                      selectedProposal?.id === proposal.id
+                    className={`border rounded-lg p-4 cursor-pointer transition hover:border-[#C19A6B] ${selectedProposal?.id === proposal.id
                         ? "border-[#C19A6B] bg-[#C19A6B]/5"
                         : "border-gray-200"
-                    }`}
+                      }`}
                     onClick={() => setSelectedProposal(proposal)}
                   >
                     <div className="flex justify-between items-start">
@@ -342,7 +360,7 @@ function DesignerProposalsPage() {
                     </div>
                     <div>
                       <span className="text-gray-500">Client:</span>{" "}
-                      {selectedProposal.clientId}
+                      {clientNames[selectedProposal.clientId] || "Unknown Client"}
                     </div>
                     <div>
                       <span className="text-gray-500">Submitted:</span>{" "}
@@ -365,8 +383,8 @@ function DesignerProposalsPage() {
                         {requestDetails[selectedProposal.requestId].budget}
                       </div>
                       <div>
-                        <span className="text-gray-500">Deadline:</span>{" "}
-                        {requestDetails[selectedProposal.requestId].deadline}
+                        <span className="text-gray-500">Duration:</span>{" "}
+                        {requestDetails[selectedProposal.requestId].duration} days
                       </div>
                       <div>
                         <span className="text-gray-500">Room Type:</span>{" "}
@@ -385,14 +403,6 @@ function DesignerProposalsPage() {
                 )}
 
                 <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    className="px-3 py-1.5 border border-[#C19A6B] text-[#C19A6B] rounded hover:bg-[#C19A6B]/5 transition"
-                    onClick={() => {
-                      // Future functionality: Message client
-                    }}
-                  >
-                    Message Client
-                  </button>
                   {selectedProposal.status === "accepted" && (
                     <button
                       className="px-3 py-1.5 bg-[#C19A6B] text-white rounded hover:bg-[#A0784A] transition"

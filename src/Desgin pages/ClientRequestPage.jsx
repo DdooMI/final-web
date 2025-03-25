@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 
 function ClientRequestPage() {
   const { user, role } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -57,9 +58,10 @@ function ClientRequestPage() {
         additionalDetails: "",
       });
 
-      // Reset success message after 3 seconds
+      // Reset success message after 3 seconds and navigate to requests page
       setTimeout(() => {
         setSubmitSuccess(false);
+        navigate("/client-requests");
       }, 3000);
     } catch (err) {
       setError(err.message);
