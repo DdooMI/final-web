@@ -61,19 +61,35 @@ function MessageDetailPage() {
               const profileRef = await getDoc(doc(db, 'users', otherUserId, 'profile', 'profileInfo'));
               
               let userData = { role: '' };
-              let profileData = { name: 'User', photoURL: '' };
+              let profileData = { name: 'User' };
               
               if (userRef.exists()) {
-                userData = userRef.data();
+                const userDoc = userRef.data();
+                userData = { 
+                  ...userData,
+                  ...userDoc,
+                  photoURL: userDoc.photoURL || null
+                };
               }
               
               if (profileRef.exists()) {
-                profileData = profileRef.data();
+                const profileDoc = profileRef.data();
+                profileData = {
+                  ...profileData,
+                  ...profileDoc,
+                  photoURL: profileDoc.photoURL || userData.photoURL || null
+                };
               }
+
+              // Prioritize photoURL from profile, then user document
+              const finalPhotoURL = profileData.photoURL || userData.photoURL || null;
+              userData.photoURL = finalPhotoURL;
+              profileData.photoURL = finalPhotoURL;
               
               setOtherUserProfile({
                 ...userData,
-                ...profileData
+                ...profileData,
+                photoURL: finalPhotoURL
               });
             } catch (error) {
               console.error('Error fetching other user profile:', error);
@@ -142,34 +158,32 @@ function MessageDetailPage() {
           <div className="flex items-center">
             {messages.length > 0 && (
               <>
-                {messages[0].senderId === user.uid ? (
-                  otherUserProfile?.photoURL ? (
+                <div className="flex-shrink-0">
+                  {otherUserProfile?.photoURL ? (
                     <img
                       className="h-10 w-10 rounded-full object-cover"
                       src={otherUserProfile.photoURL}
-                      alt="Recipient"
+                      alt={otherUserProfile?.name || "User"}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23C19A6B' opacity='0.2'/%3E%3Cpath d='M20 21c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8-8-3.6 8-8 8zm0 4c5.3 0 16 2.7 16 8v4H4v-4c0-5.3 10.7-8 16-8z' fill='%23C19A6B'/%3E%3C/svg%3E";
+                      }}
                     />
                   ) : (
-                    <div className="h-10 w-10 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
-                      <FaUser className="h-5 w-5 text-[#C19A6B]" />
-                    </div>
-                  )
-                ) : (
-                  otherUserProfile?.photoURL ? (
                     <img
-                      className="h-10 w-10 rounded-full object-cover"
-                      src={otherUserProfile.photoURL}
-                      alt="Sender"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
-                      <FaUser className="h-5 w-5 text-[#C19A6B]" />
-                    </div>
-                  )
-                )}
+                    className="h-10 w-10 rounded-full object-cover"
+                    src={"/person.gif"}
+                    alt={otherUserProfile?.name || "User"}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23C19A6B' opacity='0.2'/%3E%3Cpath d='M20 21c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8-8-3.6 8-8 8zm0 4c5.3 0 16 2.7 16 8v4H4v-4c0-5.3 10.7-8 16-8z' fill='%23C19A6B'/%3E%3C/svg%3E";
+                    }}
+                  />
+                  )}
+                </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-900">
-                    {otherUserProfile?.name || (messages[0].senderId === user.uid ? "Recipient" : "Sender")}
+                    {otherUserProfile?.name || "User"}
                   </p>
                   <p className="text-xs text-[#C19A6B]">
                     {otherUserProfile?.role === "designer" ? "Designer" : "Client"}
@@ -205,9 +219,11 @@ function MessageDetailPage() {
                           alt={otherUserProfile?.name || "Sender"}
                         />
                       ) : (
-                        <div className="h-8 w-8 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
-                          <FaUser className="h-4 w-4 text-[#C19A6B]" />
-                        </div>
+                        <img
+                        className="h-8 w-8 rounded-full object-cover"
+                        src={"/person.gif"}
+                        alt={otherUserProfile?.name || "Sender"}
+                      />
                       )}
                     </div>
                   )}

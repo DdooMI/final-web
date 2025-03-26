@@ -66,7 +66,7 @@ export const getUserConversations = async (userId) => {
       const profileRef = await getDoc(doc(db, 'users', otherUserId, 'profile', 'profileInfo'));
       
       let userData = { role: '' };
-      let profileData = { name: 'User' };
+      let profileData = { name: 'User', photoURL: '' };
       
       if (userRef.exists()) {
         userData = userRef.data();

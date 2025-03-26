@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { FaRegEnvelope, FaEnvelope, FaSearch, FaUser } from "react-icons/fa";
 import { subscribeToUserConversations } from "../firebase/messages";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebaseConfig";
 
 function MessagesPage() {
   const { user, profile } = useAuth();
@@ -24,8 +26,60 @@ function MessagesPage() {
     setLoading(true);
     
     // Subscribe to user conversations
-    const unsubscribe = subscribeToUserConversations(user.uid, (conversationsData) => {
-      setConversations(conversationsData);
+    const unsubscribe = subscribeToUserConversations(user.uid, async (conversationsData) => {
+      // Fetch profile info for each conversation's other user
+      const conversationsWithProfiles = await Promise.all(
+        conversationsData.map(async (conversation) => {
+          try {
+            const userRef = await getDoc(doc(db, 'users', conversation.otherUser.id));
+            const profileRef = await getDoc(doc(db, 'users', conversation.otherUser.id, 'profile', 'profileInfo'));
+            
+            let userData = { role: conversation.otherUser.role };
+            let profileData = { 
+              name: conversation.otherUser.name,
+              photoURL: conversation.otherUser.photoURL
+            };
+            
+            if (userRef.exists()) {
+              const userDoc = userRef.data();
+              userData = { 
+                ...userData, 
+                ...userDoc,
+                photoURL: userDoc.photoURL || null
+              };
+            }
+            
+            if (profileRef.exists()) {
+              const profileDoc = profileRef.data();
+              profileData = { 
+                ...profileData, 
+                ...profileDoc,
+                photoURL: profileDoc.photoURL || userData.photoURL || null
+              };
+            }
+            
+            // Ensure we have a valid photoURL by checking both sources
+            const finalPhotoURL = profileData.photoURL || userData.photoURL || null;
+            userData.photoURL = finalPhotoURL;
+            profileData.photoURL = finalPhotoURL;
+
+            return {
+              ...conversation,
+              otherUser: {
+                ...conversation.otherUser,
+                ...userData,
+                ...profileData,
+                photoURL: finalPhotoURL
+              }
+            };
+          } catch (error) {
+            console.error('Error fetching user profile:', error);
+            return conversation;
+          }
+        })
+      );
+
+      setConversations(conversationsWithProfiles);
       setLoading(false);
     });
 
@@ -105,13 +159,15 @@ function MessagesPage() {
                       {conversation.otherUser.photoURL ? (
                         <img
                           className="h-12 w-12 rounded-full object-cover"
-                          src={conversation.otherUser.photoURL}
+                          src={conversation.otherUser?.photoURL}
                           alt={conversation.otherUser.name}
                         />
                       ) : (
-                        <div className="h-12 w-12 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
-                          <FaUser className="h-6 w-6 text-[#C19A6B]" />
-                        </div>
+                        <img
+                          className="h-12 w-12 rounded-full object-cover"
+                          src={"/person.gif"}
+                          alt={conversation.otherUser.name}
+                        />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

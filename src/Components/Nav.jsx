@@ -36,7 +36,7 @@ function Nav() {
     const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
       setUnreadNotifications(snapshot.docs.length);
     });
-    
+
     // Subscribe to unread message count
     const unsubscribeMessages = subscribeToUnreadMessageCount(user.uid, (count) => {
       setUnreadMessages(count);
@@ -46,7 +46,7 @@ function Nav() {
       unsubscribeNotifications();
       unsubscribeMessages();
     };
-  },[user]);
+  }, [user]);
 
   const closeAllDropdowns = useCallback(() => {
     setDropdownState(INITIAL_DROPDOWN_STATE);
@@ -181,7 +181,7 @@ function Nav() {
                       My Requests
                     </NavLink>
                   </li>
-                  
+
                   <li>
                     <NavLink
                       to="/client-designers"
@@ -348,20 +348,45 @@ function Nav() {
                       <span>Services</span>
                     </NavLink>
                   </li>{user && (
-                    <> <li>
-                      <NavLink
-                        to="/notifications"
-                        className={({ isActive }) =>
-                          `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
-                        }
-                        onClick={closeAllDropdowns}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span>Notifications</span>
-                      </NavLink>
-                    </li> 
+                    <>
+                      <li>
+                        <NavLink
+                          to="/notifications"
+                          className={({ isActive }) =>
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                          }
+                          onClick={closeAllDropdowns}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                          </svg>
+                          <span>Notifications</span>
+                          {unreadNotifications > 0 && (
+                            <span className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                              {unreadNotifications}
+                            </span>
+                          )}
+                        </NavLink>
+                      </li>
+                      <li>
+                        <NavLink
+                          to="/messages"
+                          className={({ isActive }) =>
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                          }
+                          onClick={closeAllDropdowns}
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          <span>Messages</span>
+                          {unreadMessages > 0 && (
+                            <span className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                              {unreadMessages}
+                            </span>
+                          )}
+                        </NavLink>
+                      </li>
                     </>
                   )}
                   {role === 'designer' && (
