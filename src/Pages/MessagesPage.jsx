@@ -1,299 +1,142 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate, Link, useLocation } from "react-router-dom";
-import { getUserMessages, sendMessage, getUnreadMessageCount } from "../firebase/messages";
+import { Navigate, Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
-import { collection, getDocs, doc, getDoc, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
+import { FaRegEnvelope, FaEnvelope, FaSearch, FaUser } from "react-icons/fa";
+import { subscribeToUserConversations } from "../firebase/messages";
 
 function MessagesPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [userProfiles, setUserProfiles] = useState({});
-  const location = useLocation();
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Redirect if not logged in
   if (!user) {
     return <Navigate to="/login" />;
   }
 
-  // Function to fetch messages
-  const fetchMessages = async () => {
-    try {
-      const sentQuery = query(
-        collection(db, 'messages'),
-        where('senderId', '==', user.uid)
-      );
-      
-      const receivedQuery = query(
-        collection(db, 'messages'),
-        where('recipientId', '==', user.uid)
-      );
-
-      const [sentSnapshot, receivedSnapshot] = await Promise.all([
-        getDocs(sentQuery),
-        getDocs(receivedQuery)
-      ]);
-
-      handleMessageUpdate(sentSnapshot, true);
-      handleMessageUpdate(receivedSnapshot, false);
-    } catch (err) {
-      console.error("Error fetching messages:", err);
-      setError("Failed to load messages. Please try again later.");
-    }
-  };
-
-  // Check for query parameters (for new message creation)
   useEffect(() => {
-    const queryParams = new URLSearchParams(location.search);
-    const recipientId = queryParams.get('recipient');
-    const subject = queryParams.get('subject');
-    const requestId = queryParams.get('requestId');
+    if (!user) return;
+
+    setLoading(true);
     
-    // If we have recipient and subject, create a new message
-    if (recipientId && subject && user) {
-      const createNewMessage = async () => {
-        try {
-          // Create a new message
-          await sendMessage({
-            senderId: user.uid,
-            recipientId,
-            content: `Hello, I'd like to discuss my design request with you.`,
-            subject,
-          });
-          
-          // Reload messages
-          fetchMessages();
-          
-          // Clear URL parameters
-          window.history.replaceState({}, document.title, "/messages");
-        } catch (err) {
-          console.error("Error creating new message:", err);
-          setError("Failed to create new message. Please try again.");
-        }
-      };
-      
-      createNewMessage();
-    }
-  }, [location.search, user]);
+    // Subscribe to user conversations
+    const unsubscribe = subscribeToUserConversations(user.uid, (conversationsData) => {
+      setConversations(conversationsData);
+      setLoading(false);
+    });
 
-  // Set up real-time message listener
-  const setupMessageListener = () => {
-    try {
-      const sentQuery = query(
-        collection(db, 'messages'),
-        where('senderId', '==', user.uid)
-      );
-      
-      const receivedQuery = query(
-        collection(db, 'messages'),
-        where('recipientId', '==', user.uid)
-      );
-
-      const unsubscribeSent = onSnapshot(sentQuery, (snapshot) => {
-        handleMessageUpdate(snapshot, true);
-      });
-
-      const unsubscribeReceived = onSnapshot(receivedQuery, (snapshot) => {
-        handleMessageUpdate(snapshot, false);
-      });
-
-      return () => {
-        unsubscribeSent();
-        unsubscribeReceived();
-      };
-    } catch (err) {
-      console.error("Error setting up message listener:", err);
-      setError("Failed to load messages. Please try again later.");
-    }
-  };
-
-  // Handle message updates
-  const handleMessageUpdate = async (snapshot, isSender) => {
-    try {
-      const updatedMessages = [];
-      const newUserIds = new Set();
-
-      snapshot.forEach((doc) => {
-        const messageData = doc.data();
-        const otherUserId = isSender ? messageData.recipientId : messageData.senderId;
-        newUserIds.add(otherUserId);
-        
-        updatedMessages.push({
-          id: doc.id,
-          ...messageData,
-          isSender
-        });
-      });
-
-      // Fetch profiles for new users
-      for (const userId of newUserIds) {
-        if (!userProfiles[userId]) {
-          try {
-            const profileRef = collection(db, "users", userId, "profile");
-            const profileSnap = await getDocs(profileRef);
-            
-            if (!profileSnap.empty) {
-              setUserProfiles(prev => ({
-                ...prev,
-                [userId]: profileSnap.docs[0].data()
-              }));
-            } else {
-              setUserProfiles(prev => ({
-                ...prev,
-                [userId]: { name: "User", photoURL: "/person.gif" }
-              }));
-            }
-          } catch (err) {
-            console.error(`Error fetching profile for user ${userId}:`, err);
-          }
-        }
-      }
-
-      setConversations(prev => {
-        const newMessages = [...prev];
-        updatedMessages.forEach(message => {
-          const conversationIndex = newMessages.findIndex(
-            conv => conv.otherUserId === (isSender ? message.recipientId : message.senderId)
-          );
-
-          if (conversationIndex === -1) {
-            const otherUserId = isSender ? message.recipientId : message.senderId;
-            newMessages.push({
-              id: message.conversationId,
-              otherUserId,
-              messages: [message],
-              lastMessage: message,
-              unreadCount: !isSender && !message.read ? 1 : 0,
-              profile: userProfiles[otherUserId] || { name: "User", photoURL: "/person.gif" }
-            });
-          } else {
-            const conversation = newMessages[conversationIndex];
-            const messageIndex = conversation.messages.findIndex(m => m.id === message.id);
-
-            if (messageIndex === -1) {
-              conversation.messages.push(message);
-            } else {
-              conversation.messages[messageIndex] = message;
-            }
-
-            conversation.messages.sort((a, b) => b.createdAt - a.createdAt);
-            conversation.lastMessage = conversation.messages[0];
-            conversation.unreadCount = conversation.messages.filter(
-              m => !m.isSender && !m.read
-            ).length;
-          }
-        });
-
-        return newMessages.sort((a, b) => 
-          b.lastMessage.createdAt - a.lastMessage.createdAt
-        );
-      });
-    } catch (err) {
-      console.error("Error handling message update:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      const unsubscribe = setupMessageListener();
-      return () => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      };
-    }
+    return () => unsubscribe();
   }, [user]);
 
-  // Group messages by conversation
-  const groupMessagesByConversation = (messages) => {
-    const conversationMap = {};
+  // Group conversations by otherUser.id and keep only the most recent one
+  const groupedConversations = conversations.reduce((acc, conversation) => {
+    const existingConversation = acc.find(c => c.otherUser.id === conversation.otherUser.id);
     
-    messages.forEach(message => {
-      const otherUserId = message.isSender ? message.recipientId : message.senderId;
-      const conversationId = message.conversationId || `${Math.min(user.uid, otherUserId)}-${Math.max(user.uid, otherUserId)}`;
-      
-      if (!conversationMap[conversationId]) {
-        conversationMap[conversationId] = {
-          id: conversationId,
-          otherUserId,
-          messages: [],
-          lastMessage: null,
-          unreadCount: 0,
-          profile: userProfiles[otherUserId] || { name: "User", photoURL: "/person.gif" }
-        };
-      }
-      
-      conversationMap[conversationId].messages.push(message);
-      if (!message.read && !message.isSender) {
-        conversationMap[conversationId].unreadCount++;
-      }
-    });
+    if (!existingConversation) {
+      acc.push(conversation);
+    } else if (conversation.timestamp > existingConversation.timestamp) {
+      // Replace with more recent conversation
+      const index = acc.findIndex(c => c.otherUser.id === conversation.otherUser.id);
+      acc[index] = conversation;
+    }
     
-    // Sort messages and get last message for each conversation
-    Object.values(conversationMap).forEach(conv => {
-      conv.messages.sort((a, b) => b.createdAt - a.createdAt);
-      conv.lastMessage = conv.messages[0];
-    });
-    
-    return Object.values(conversationMap);
-  };
+    return acc;
+  }, []);
+  
+  // Filter conversations based on search term
+  const filteredConversations = groupedConversations.filter((conversation) => {
+    if (!searchTerm) return true;
+    return conversation.otherUser.name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-30 pb-10 px-4 sm:px-6 lg:px-8 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#C19A6B]"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-30 pb-10 px-4 sm:px-6 lg:px-8 animate-fadeIn">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Chats</h1>
+    <div className="min-h-screen bg-gray-50 pt-24 pb-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C19A6B] focus:border-transparent"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            </div>
+          </div>
 
-        {/* Conversation List */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="divide-y divide-gray-200">
-            {conversations.length > 0 ? (
-              conversations.map((conversation) => (
-                <Link
+          {filteredConversations.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-[#C19A6B]/10 mb-4">
+                <FaRegEnvelope className="h-8 w-8 text-[#C19A6B]" />
+              </div>
+              <h3 className="mt-2 text-lg font-medium text-gray-900">No messages yet</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {user.role === "client" 
+                  ? "Start a conversation with a designer by viewing their profile or proposal."
+                  : "Wait for clients to message you about their design needs."}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {filteredConversations.map((conversation) => (
+                <motion.div
                   key={conversation.id}
-                  to={`/messages/${conversation.lastMessage.id}`}
-                  className={`block hover:bg-gray-50 transition-colors duration-150 ${conversation.unreadCount > 0 ? 'bg-[#C19A6B]/5' : ''}`}
+                  whileHover={{ backgroundColor: "#f9f5f1" }}
+                  className="py-4 cursor-pointer p-2 rounded-lg"
+                  onClick={() => navigate(`/messages/${conversation.id}`)}
                 >
-                  <div className="p-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="relative">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      {conversation.otherUser.photoURL ? (
                         <img
-                          src={conversation.profile.photoURL}
-                          alt={conversation.profile.name}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="h-12 w-12 rounded-full object-cover"
+                          src={conversation.otherUser.photoURL}
+                          alt={conversation.otherUser.name}
                         />
-                        {conversation.unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                            {conversation.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
-                            {conversation.profile.name}
-                          </h3>
-                          <span className="text-xs text-gray-500">
-                            {formatDistanceToNow(conversation.lastMessage.createdAt.toDate(), { addSuffix: true })}
-                          </span>
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
+                          <FaUser className="h-6 w-6 text-[#C19A6B]" />
                         </div>
-                        <p className="text-sm text-gray-600 truncate mt-1">
-                          {conversation.lastMessage.isSender && "You: "}
-                          {conversation.lastMessage.content}
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {conversation.otherUser.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatDistanceToNow(conversation.timestamp, { addSuffix: true })}
                         </p>
                       </div>
+                      <div className="flex items-center">
+                        <p className="text-sm text-gray-500 truncate">
+                          {conversation.lastMessageContent}
+                        </p>
+                      </div>
+                      <p className="text-xs text-[#C19A6B]">
+                        {conversation.otherUser.role === "designer" ? "Designer" : "Client"}
+                      </p>
                     </div>
                   </div>
-                </Link>
-              ))
-            ) : (
-              <div className="p-6 text-center text-gray-500">
-                No conversations yet
-              </div>
-            )}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

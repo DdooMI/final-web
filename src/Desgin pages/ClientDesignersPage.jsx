@@ -114,14 +114,7 @@ function ClientDesignersPage() {
                     >
                       View Portfolio
                     </button>
-                    <button
-                      className="w-full px-4 py-2 border border-[#C19A6B] text-[#C19A6B] rounded-md hover:bg-[#C19A6B]/5 transition"
-                      onClick={() => {
-                        navigate(`/message-details/${designer.id}`);
-                      }}
-                    >
-                      Message Designer
-                    </button>
+
                   </div>
                 </div>
               </div>

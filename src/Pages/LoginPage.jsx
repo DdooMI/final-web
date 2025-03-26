@@ -120,6 +120,15 @@ function Login() {
            
           </div>
           <p className="text-red-500 text-sm">{errors.password?.message}</p>
+          
+          <div className="flex justify-end">
+            <NavLink
+              to="/forgot-password"
+              className="text-[#dfb58e] hover:text-white transition-colors text-sm font-medium"
+            >
+              Forgot Password?
+            </NavLink>
+          </div>
 
           <motion.button
             className="w-full mx-auto p-4 text-white bg-[#A67B5B] text-xl font-semibold rounded-xl hover:bg-[#8B6B4A] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 relative"
