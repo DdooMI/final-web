@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, updateDoc, doc, getDoc, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 
 // Create a new message
@@ -24,8 +24,10 @@ export const sendMessage = async ({
       content,
       subject,
       read: false,
+      delivered: false,
       conversationId,
       createdAt: serverTimestamp(),
+      status: 'sent',
     });
     return messageRef.id;
   } catch (error) {
@@ -39,7 +41,8 @@ export const markMessageAsRead = async (messageId) => {
   try {
     const messageRef = doc(db, 'messages', messageId);
     await updateDoc(messageRef, {
-      read: true
+      read: true,
+      status: 'read'
     });
   } catch (error) {
     console.error('Error marking message as read:', error);
@@ -133,7 +136,7 @@ export const getUnreadMessageCount = (userId, callback) => {
 };
 
 // Get all messages in a conversation between two users
-export const getConversationMessages = async (userId1, userId2) => {
+export const getConversationMessages = (userId1, userId2, callback) => {
   try {
     // Create the conversation ID by sorting the user IDs
     const sortedIds = [userId1, userId2].sort();
@@ -143,22 +146,25 @@ export const getConversationMessages = async (userId1, userId2) => {
     const q = query(
       collection(db, 'messages'),
       where('conversationId', '==', conversationId),
-      // Order by timestamp, oldest first for conversation flow
       orderBy('createdAt', 'asc')
     );
     
-    const querySnapshot = await getDocs(q);
-    const messages = [];
-    
-    querySnapshot.forEach((doc) => {
-      messages.push({
-        id: doc.id,
-        ...doc.data(),
-        isSender: doc.data().senderId === userId1
+    // Set up real-time listener
+    return onSnapshot(q, (snapshot) => {
+      const messages = [];
+      snapshot.forEach((doc) => {
+        const messageData = doc.data();
+        messages.push({
+          id: doc.id,
+          ...messageData,
+          isSender: messageData.senderId === userId1,
+          timestamp: messageData.createdAt ? messageData.createdAt.toDate() : new Date()
+        });
       });
+      
+      callback(messages);
     });
-    
-    return messages;
+
   } catch (error) {
     console.error('Error getting conversation messages:', error);
     throw error;

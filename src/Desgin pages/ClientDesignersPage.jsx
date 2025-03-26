@@ -105,14 +105,24 @@ function ClientDesignersPage() {
                   </h2>
                   <p className="text-gray-600 mb-4">{designer.email}</p>
 
-                  <button
-                    className="w-full px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition"
-                    onClick={() => {
-                      navigate(`/designer-portfolio/${designer.id}`);
-                    }}
-                  >
-                    View Portfolio
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      className="w-full px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition"
+                      onClick={() => {
+                        navigate(`/designer-portfolio/${designer.id}`);
+                      }}
+                    >
+                      View Portfolio
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 border border-[#C19A6B] text-[#C19A6B] rounded-md hover:bg-[#C19A6B]/5 transition"
+                      onClick={() => {
+                        navigate(`/message-details/${designer.id}`);
+                      }}
+                    >
+                      Message Designer
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

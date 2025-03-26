@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Navigate, Link } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
 import { motion } from "framer-motion";
@@ -18,6 +18,94 @@ function MessageDetailPage() {
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
   const [conversationMessages, setConversationMessages] = useState([]);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Get message status icon
+  const getMessageStatusIcon = (message) => {
+    if (!message.isSender) return null;
+    
+    const iconClasses = "w-4 h-4";
+    
+    if (message.status === 'read') {
+      return (
+        <img
+          src="/double-check.svg"
+          alt="Read"
+          className={`${iconClasses} text-blue-500`}
+        />
+      );
+    } else if (message.delivered) {
+      return (
+        <img
+          src="/check-mark.svg"
+          alt="Delivered"
+          className={`${iconClasses} text-gray-500`}
+        />
+      );
+    } else {
+      return (
+        <svg
+          className={`${iconClasses} text-gray-400`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      );
+    }
+  };
+
+  // Handle reply submission
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
+
+    try {
+      setSendingReply(true);
+
+      // Determine recipient ID (the other person in the conversation)
+      const recipientId = message.isSender ? message.recipientId : message.senderId;
+
+      // Send the reply message with the same conversationId
+      const messageId = await sendMessage({
+        senderId: user.uid,
+        recipientId,
+        content: replyText,
+        subject: `Re: ${message.subject}`,
+        conversationId: message.conversationId
+      });
+
+      // Clear the reply text
+      setReplyText("");
+      
+      // Add the new message to the conversation without reloading the page
+      const newMessage = {
+        id: messageId,
+        content: replyText,
+        subject: `Re: ${message.subject}`,
+        timestamp: "just now",
+        isSender: true
+      };
+      
+      setConversationMessages(prev => [...prev, newMessage]);
+      
+      // Don't redirect, stay on the conversation page
+    } catch (err) {
+      console.error("Error sending reply:", err);
+      setError("Failed to send reply. Please try again.");
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   // Redirect if not logged in
   if (!user) {
@@ -75,20 +163,22 @@ function MessageDetailPage() {
 
           setSenderInfo(profileData);
           
-          // Fetch all messages in this conversation
-          const conversationData = await getConversationMessages(user.uid, profileUserId);
+          // Set up real-time listener for conversation messages
+          const unsubscribe = getConversationMessages(user.uid, profileUserId, (messages) => {
+            const formattedMessages = messages.map(msg => ({
+              id: msg.id,
+              content: msg.content,
+              subject: msg.subject || "(No subject)",
+              timestamp: msg.createdAt ? formatDistanceToNow(msg.timestamp, { addSuffix: true }) : "Unknown time",
+              isSender: msg.isSender,
+              status: msg.status || 'sent',
+              delivered: msg.delivered || false
+            }));
+            setConversationMessages(formattedMessages);
+            scrollToBottom();
+          });
           
-          // Format conversation messages for display
-          const formattedConversation = conversationData.map(msg => ({
-            id: msg.id,
-            content: msg.content,
-            subject: msg.subject || "(No subject)",
-            timestamp: msg.createdAt ? formatDistanceToNow(msg.createdAt.toDate(), { addSuffix: true }) : "Unknown time",
-            isSender: msg.senderId === user.uid,
-          }));
-          
-          setConversationMessages(formattedConversation);
-          
+          return () => unsubscribe();
         } catch (err) {
           console.error(`Error fetching profile or conversation for user ${profileUserId}:`, err);
         }
@@ -134,67 +224,6 @@ function MessageDetailPage() {
     );
   }
 
-  // Get message type icon
-  const getMessageIcon = () => {
-    return (
-      <div className="bg-blue-100 p-3 rounded-full">
-        <svg
-          className="w-6 h-6 text-blue-500"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path
-            fillRule="evenodd"
-            d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </div>
-    );
-  };
-
-  // Handle reply submission
-  const handleReply = async () => {
-    if (!replyText.trim()) return;
-
-    try {
-      setSendingReply(true);
-
-      // Determine recipient ID (the other person in the conversation)
-      const recipientId = message.isSender ? message.recipientId : message.senderId;
-
-      // Send the reply message with the same conversationId
-      const messageId = await sendMessage({
-        senderId: user.uid,
-        recipientId,
-        content: replyText,
-        subject: `Re: ${message.subject}`,
-        conversationId: message.conversationId
-      });
-
-      // Clear the reply text
-      setReplyText("");
-      
-      // Add the new message to the conversation without reloading the page
-      const newMessage = {
-        id: messageId,
-        content: replyText,
-        subject: `Re: ${message.subject}`,
-        timestamp: "just now",
-        isSender: true
-      };
-      
-      setConversationMessages(prev => [...prev, newMessage]);
-      
-      // Don't redirect, stay on the conversation page
-    } catch (err) {
-      console.error("Error sending reply:", err);
-      setError("Failed to send reply. Please try again.");
-    } finally {
-      setSendingReply(false);
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -208,7 +237,7 @@ function MessageDetailPage() {
           <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center space-x-3">
-                {getMessageIcon()}
+                {getMessageStatusIcon(message)}
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
                     {message.subject}
@@ -253,54 +282,48 @@ function MessageDetailPage() {
           </div>
 
           {/* Message Content */}
-          <div className="p-6 bg-white">
-            <div className="mb-6 border-b border-gray-200 pb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Conversation</h3>
-
-              {/* Conversation History */}
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 mb-4">
+          <div className="flex flex-col h-[calc(100vh-200px)] bg-white">
+            {/* Message History */}
+            <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+              <div className="space-y-4">
                 {conversationMessages.length > 0 ? (
                   conversationMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.isSender ? "justify-end" : "justify-start"}`}
+                      className={`flex items-end space-x-2 ${msg.isSender ? "justify-end" : "justify-start"}`}
                     >
                       {!msg.isSender && (
                         <img
                           src={senderInfo.photoURL || "/person.gif"}
                           alt={senderInfo.name}
-                          className="h-8 w-8 rounded-full mr-2 self-end"
+                          className="h-8 w-8 rounded-full"
                         />
                       )}
                       <div
-                        className={`max-w-[70%] rounded-lg p-3 ${msg.isSender
-                          ? "bg-[#A67B5B] text-white rounded-tr-none"
-                          : "bg-gray-100 text-gray-700 rounded-tl-none"}`}
+                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${msg.isSender
+                          ? "bg-[#A67B5B] text-white ml-2 shadow-md"
+                          : "bg-gray-100 text-gray-800 mr-2 shadow-sm"}`}
                       >
-                        <p className="text-xs font-medium mb-1 opacity-75">
-                          {msg.subject}
-                        </p>
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                        <div className="flex justify-end mt-1">
-                          <span className="text-xs opacity-75">
+                        <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                        <div className={`flex items-center justify-end mt-1 space-x-1 ${msg.isSender ? "text-white/70" : "text-gray-500"}`}>
+                          <span className="text-xs">
                             {msg.timestamp}
                           </span>
+                          {getMessageStatusIcon(msg)}
                         </div>
                       </div>
                       {msg.isSender && (
-                        <div className="flex flex-col items-center ml-2 justify-end">
-                          <img
-                            src={user.photoURL || "/person.gif"}
-                            alt="You"
-                            className="h-8 w-8 rounded-full"
-                          />
-                        </div>
+                        <img
+                          src={user.photoURL || "/person.gif"}
+                          alt="You"
+                          className="h-8 w-8 rounded-full"
+                        />
                       )}
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-gray-500 py-4">
-                    No messages in this conversation yet.
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>No messages yet. Start the conversation!</p>
                   </div>
                 )}
               </div>
@@ -341,6 +364,7 @@ function MessageDetailPage() {
                       </div>
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
             )}
@@ -364,44 +388,15 @@ function MessageDetailPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  className="px-4 py-2 bg-[#A67B5B] text-white rounded-md hover:bg-[#8B6B4A] transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleReply}
-                  disabled={sendingReply || !replyText.trim()}
-                >
-                  {sendingReply ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-5 h-5 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                        />
-                      </svg>
-                      Send Reply
-                    </>
-                  )}
-                </button>
-                <Link to="/messages" className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
-                  Cancel
-                </Link>
-              </div>
+              <button
+                className={`px-4 py-2 rounded-md ${sendingReply
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#C19A6B] hover:bg-[#A0784A]"} text-white transition-colors`}
+                onClick={handleReply}
+                disabled={sendingReply}
+              >
+                {sendingReply ? "Sending..." : "Send Reply"}
+              </button>
             </div>
           </div>
         </div>
@@ -410,4 +405,4 @@ function MessageDetailPage() {
   );
 }
 
-          export default MessageDetailPage;
+export default MessageDetailPage;
