@@ -10,6 +10,7 @@ import Signup from "./Pages/SignupPage";
 import ForgotPasswordPage from "./Pages/ForgotPasswordPage";
 import ProfilePage from "./Pages/ProfilePage";
 import ProjectsPage from "./Pages/ProjectsPage";
+import ProjectPage from "./Pages/ProjectPage";
 import NotificationsPage from "./Pages/NotificationsPage";
 import NotificationDetailPage from "./Pages/NotificationDetailPage";
 import MessagesPage from "./Pages/MessagesPage";
@@ -40,6 +41,7 @@ function App() {
         <Route path="/" element={<IndexPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/project/:proposalId" element={<ProjectPage />} />
         <Route path="/services" element={<ServicePage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<Login />} />

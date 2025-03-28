@@ -12,6 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
+import { createNotification } from "../firebase/notifications";
 import { formatDistanceToNow } from "date-fns";
 
 function DesignerProposalsPage() {
@@ -131,9 +132,36 @@ function DesignerProposalsPage() {
 
     try {
       const proposalRef = doc(db, "designProposals", proposalId);
+      const proposalSnap = await getDoc(proposalRef);
+      
+      if (!proposalSnap.exists()) {
+        throw new Error("Proposal not found");
+      }
+      
+      const proposalData = proposalSnap.data();
+      
       await updateDoc(proposalRef, {
         status: "completed",
       });
+
+      // Update the request status to completed
+      if (proposalData.requestId) {
+        const requestRef = doc(db, "designRequests", proposalData.requestId);
+        await updateDoc(requestRef, {
+          status: "completed"
+        });
+      }
+
+      // Create notification for client
+      if (proposalData.clientId) {
+        await createNotification({
+          userId: proposalData.clientId,
+          title: "Proposal Completed",
+          message: `The designer has marked their proposal as completed. Please review the final design.`,
+          type: "success",
+          relatedId: proposalId,
+        });
+      }
 
       // Update local state
       setProposals((prevProposals) =>
@@ -144,6 +172,17 @@ function DesignerProposalsPage() {
 
       if (selectedProposal?.id === proposalId) {
         setSelectedProposal((prev) => ({ ...prev, status: "completed" }));
+      }
+
+      // Update request details local state
+      if (proposalData.requestId && requestDetails[proposalData.requestId]) {
+        setRequestDetails(prev => ({
+          ...prev,
+          [proposalData.requestId]: {
+            ...prev[proposalData.requestId],
+            status: "completed"
+          }
+        }));
       }
 
       setUpdateSuccess(true);
@@ -404,39 +443,47 @@ function DesignerProposalsPage() {
 
                 <div className="mt-6 flex justify-end space-x-3">
                   {selectedProposal.status === "accepted" && (
-                    <button
-                      className="px-3 py-1.5 bg-[#C19A6B] text-white rounded hover:bg-[#A0784A] transition"
-                      onClick={() => handleMarkAsCompleted(selectedProposal.id)}
-                      disabled={updateLoading}
-                    >
-                      {updateLoading ? (
-                        <span className="flex items-center">
-                          <svg
-                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          Updating...
-                        </span>
-                      ) : (
-                        "Mark as Completed"
-                      )}
-                    </button>
+                    <>
+                      <button
+                        className="px-3 py-1.5 border border-[#C19A6B] text-[#C19A6B] rounded hover:bg-[#C19A6B]/10 transition"
+                        onClick={() => window.location.href = `/project/${selectedProposal.id}`}
+                      >
+                        View Project Page
+                      </button>
+                      <button
+                        className="px-3 py-1.5 bg-[#C19A6B] text-white rounded hover:bg-[#A0784A] transition"
+                        onClick={() => handleMarkAsCompleted(selectedProposal.id)}
+                        disabled={updateLoading}
+                      >
+                        {updateLoading ? (
+                          <span className="flex items-center">
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Updating...
+                          </span>
+                        ) : (
+                          "Mark as Completed"
+                        )}
+                      </button>
+                    </>
                   )}
                 </div>
               </motion.div>

@@ -8,10 +8,13 @@ import {
   where,
   doc,
   getDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { formatDistanceToNow } from "date-fns";
+import { FiMessageSquare, FiCheck, FiX } from "react-icons/fi";
 
 import { db } from "../firebase/firebaseConfig";
+import { createNotification } from "../firebase/notifications";
 
 function ClientRequestsPage() {
   const { user, role } = useAuth();
@@ -19,7 +22,136 @@ function ClientRequestsPage() {
   const [proposals, setProposals] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  
+  // Handle updating proposal status (accept/reject)
+  const handleUpdateProposalStatus = async (proposalId, newStatus) => {
+    if (!proposalId) return;
+    
+    setUpdateLoading(true);
+    setError(null);
+    
+    try {
+      const proposalRef = doc(db, "designProposals", proposalId);
+      const proposalSnap = await getDoc(proposalRef);
+      
+      if (!proposalSnap.exists()) {
+        throw new Error("Proposal not found");
+      }
+      
+      const proposalData = proposalSnap.data();
+      
+      // Update proposal status
+      await updateDoc(proposalRef, {
+        status: newStatus,
+      });
+      
+      // Create notification for designer
+      await createNotification({
+        userId: proposalData.designerId,
+        title: `Proposal ${newStatus}`,
+        message: newStatus === "accepted" 
+          ? `Your proposal for "${selectedRequest.title}" has been accepted by the client. You can now access the project page.` 
+          : newStatus === "completed" 
+          ? `Your proposal for "${selectedRequest.title}" has been confirmed as completed by the client.`
+          : `Your proposal for "${selectedRequest.title}" has been ${newStatus} by the client.`,
+        type: newStatus === "accepted" || newStatus === "completed" ? "success" : "info",
+        relatedId: proposalId,
+      });
+      
+      // If accepting a proposal, initialize project status and update request status
+      if (newStatus === "accepted") {
+        await updateDoc(proposalRef, {
+          projectStatus: "in_progress",
+        });
+        
+        // Update the request status to in_progress
+        const requestRef = doc(db, "designRequests", selectedRequest.id);
+        await updateDoc(requestRef, {
+          status: "in_progress"
+        });
+        
+        // Update local state for the request
+        setRequests(prevRequests => 
+          prevRequests.map(req => 
+            req.id === selectedRequest.id ? { ...req, status: "in_progress" } : req
+          )
+        );
+      } else if (newStatus === "completed") {
+        // Update the request status to completed
+        const requestRef = doc(db, "designRequests", selectedRequest.id);
+        await updateDoc(requestRef, {
+          status: "completed"
+        });
+        
+        // Update local state for the request
+        setRequests(prevRequests => 
+          prevRequests.map(req => 
+            req.id === selectedRequest.id ? { ...req, status: "completed" } : req
+          )
+        );
+      }
+      
+      // Update local state
+      setProposals((prevProposals) => {
+        const updatedProposals = { ...prevProposals };
+        
+        // Update the specific proposal in the correct request
+        if (updatedProposals[selectedRequest.id]) {
+          updatedProposals[selectedRequest.id] = updatedProposals[selectedRequest.id].map((p) =>
+            p.id === proposalId ? { ...p, status: newStatus } : p
+          );
+        }
+        
+        return updatedProposals;
+      });
+      
+      // If accepting a proposal, reject all other pending proposals for this request
+      if (newStatus === "accepted") {
+        const otherProposals = proposals[selectedRequest.id].filter(
+          (p) => p.id !== proposalId && p.status === "pending"
+        );
+        
+        for (const proposal of otherProposals) {
+          const otherProposalRef = doc(db, "designProposals", proposal.id);
+          await updateDoc(otherProposalRef, {
+            status: "rejected",
+          });
+          
+          // Create notification for other designers
+          await createNotification({
+            userId: proposal.designerId,
+            title: "Proposal rejected",
+            message: `Another proposal has been accepted for "${selectedRequest.title}".`,
+            type: "info",
+            relatedId: proposal.id,
+          });
+        }
+        
+        // Update local state for other proposals
+        setProposals((prevProposals) => {
+          const updatedProposals = { ...prevProposals };
+          
+          if (updatedProposals[selectedRequest.id]) {
+            updatedProposals[selectedRequest.id] = updatedProposals[selectedRequest.id].map((p) =>
+              p.id !== proposalId && p.status === "pending" ? { ...p, status: "rejected" } : p
+            );
+          }
+          
+          return updatedProposals;
+        });
+      }
+      
+      setUpdateSuccess(true);
+      setTimeout(() => setUpdateSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
 
 
 
@@ -122,6 +254,16 @@ function ClientRequestsPage() {
           </Link>
         </div>
 
+        {updateSuccess && (
+          <div
+            className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 relative"
+            role="alert"
+          >
+            <strong className="font-bold">Success!</strong>
+            <span className="block sm:inline"> Proposal status updated successfully.</span>
+          </div>
+        )}
+        
         {error && (
           <div
             className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative"
@@ -288,40 +430,53 @@ function ClientRequestsPage() {
                           </div>
                         </div>
                         <div className="mt-4 flex justify-end space-x-3">
-                          <button
-                            className="px-3 py-1.5 border border-[#C19A6B] text-[#C19A6B] rounded hover:bg-[#C19A6B]/10 transition"
-                            onClick={async () => {
-                              try {
-                                // Import needed only when the function is called
-                                const { sendMessage } = await import("../firebase/messages");
-                                
-                                // Start a new conversation with the designer
-                                const conversationId = await sendMessage({
-                                  senderId: user.uid,
-                                  receiverId: proposal.designerId,
-                                  content: `Hello, I'm interested in your proposal for my "${selectedRequest.title}" request.`,
-                                });
-                                
-                                // Navigate to the conversation
-                                window.location.href = `/messages/${conversationId}`;
-                              } catch (error) {
-                                console.error("Error starting conversation:", error);
-                                alert("Failed to start conversation. Please try again.");
-                              }
-                            }}
-                          >
-                            Message Designer
-                          </button>
-
-                          {proposal.status === "pending" && (
+                          {proposal.status !== "rejected" && (
                             <button
-                              className="px-3 py-1.5 bg-[#C19A6B] text-white rounded hover:bg-[#A0784A] transition"
-                              onClick={() => {
-                                // Future functionality: Accept proposal
+                              className="px-4 py-2 border border-[#C19A6B] text-[#C19A6B] rounded-md hover:bg-[#C19A6B]/10 transition flex items-center gap-2 shadow-sm"
+                              onClick={async () => {
+                                try {
+                                  // Import needed only when the function is called
+                                  const { sendMessage } = await import("../firebase/messages");
+                                  
+                                  // Start a new conversation with the designer
+                                  const conversationId = await sendMessage({
+                                    senderId: user.uid,
+                                    receiverId: proposal.designerId,
+                                    content: `Hello, I'm interested in your proposal for my "${selectedRequest.title}" request.`,
+                                  });
+                                  
+                                  // Navigate to the conversation
+                                  window.location.href = `/messages/${conversationId}`;
+                                } catch (error) {
+                                  console.error("Error starting conversation:", error);
+                                  alert("Failed to start conversation. Please try again.");
+                                }
                               }}
                             >
-                              Accept Proposal
+                              <FiMessageSquare className="text-[#C19A6B]" />
+                              <span>Message Designer</span>
                             </button>
+                          )}
+
+                          {proposal.status === "pending" && (
+                            <div className="flex space-x-2">
+                              <button
+                                className="px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition flex items-center gap-2 shadow-sm font-medium"
+                                onClick={() => handleUpdateProposalStatus(proposal.id, "accepted")}
+                                disabled={updateLoading}
+                              >
+                                <FiCheck className="text-white" />
+                                <span>{updateLoading ? "Processing..." : "Accept"}</span>
+                              </button>
+                              <button
+                                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition flex items-center gap-2 shadow-sm font-medium"
+                                onClick={() => handleUpdateProposalStatus(proposal.id, "rejected")}
+                                disabled={updateLoading}
+                              >
+                                <FiX className="text-white" />
+                                <span>Reject</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>

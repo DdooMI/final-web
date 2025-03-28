@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Navigate, Link } from "react-router-dom";
+import { useParams, Navigate, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 function NotificationDetailPage() {
   const { user } = useAuth();
   const { id } = useParams();
+  const navigate = useNavigate();
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -169,6 +170,28 @@ function NotificationDetailPage() {
             </svg>
           </div>
         );
+    }
+  };
+
+  const handleActionClick = () => {
+    // Handle notification action based on type
+    if (notification.relatedId) {
+      // Check if it's a proposal notification for a designer
+      if (user.role === "designer" && 
+          (notification.title.includes("Proposal") && 
+           (notification.message.includes("accepted") || notification.message.includes("rejected")))) {
+        // Navigate to designer proposals page for designers with the related proposal ID
+        navigate(`/designer-proposals?proposalId=${notification.relatedId}`);
+      } 
+      // Check if it's a proposal acceptance notification for clients
+      else if (notification.title === "Proposal accepted" || 
+          (notification.title.includes("Proposal") && notification.message.includes("accepted"))) {
+        // Navigate to project page
+        navigate(`/project/${notification.relatedId}`);
+      } else {
+        // Navigate to related item
+        navigate(`/notifications?id=${notification.relatedId}`);
+      }
     }
   };
 

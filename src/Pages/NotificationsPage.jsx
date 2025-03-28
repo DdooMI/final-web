@@ -6,7 +6,7 @@ import { db } from "../firebase/firebaseConfig";
 import { formatDistanceToNow } from "date-fns";
 
 function NotificationsPage() {
-  const { user } = useAuth();
+  const { user,role } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
 
   // Redirect if not logged in
@@ -170,16 +170,25 @@ function NotificationsPage() {
                   }`}
                   onClick={async () => {
                     try {
-                      // Mark notification as read
+                      console.log("Notification clicked:", notification);
+                      console.log(":", role);
+
+                     
                       if (!notification.read) {
                         const notificationRef = doc(db, "notifications", notification.id);
                         await updateDoc(notificationRef, { read: true });
                       }
                       
-                      // Navigate to the appropriate page based on notification type and related ID
+                      // Navigate to the appropriate page based on notification type, related ID, and user role
                       if (notification.relatedId) {
-                        // If it's a design request related notification, navigate to client requests page
-                        window.location.href = `/client-requests?requestId=${notification.relatedId}`;
+                        // Check if it's any proposal-related notification for a designer
+                        if (role === "designer" && notification.title.includes("Proposal")) {
+                          // Navigate to designer proposals page for designers
+                          window.location.href = `/designer-proposals?proposalId=${notification.relatedId}`;
+                        } else {
+                          // For clients or other notification types, navigate to client requests page
+                          window.location.href = `/client-requests?requestId=${notification.relatedId}`;
+                        }
                       }
                     } catch (error) {
                       console.error("Error updating notification status:", error);

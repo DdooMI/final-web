@@ -8,6 +8,8 @@ import {
   query,
   where,
   addDoc,
+  doc,
+  updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
@@ -111,6 +113,12 @@ function DesignerRequestsPage() {
         description: proposalData.description,
         status: "pending",
         createdAt: serverTimestamp(),
+      });
+
+      // Update the request status
+      const requestRef = doc(db, "designRequests", selectedRequest.id);
+      await updateDoc(requestRef, {
+        status: "pending"
       });
 
       // Create notification for the client
