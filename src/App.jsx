@@ -1,6 +1,7 @@
 import { Route, Routes, useLocation } from "react-router-dom";
 import Footer from "./Components/Footer";
 import Nav from "./Components/Nav";
+import ScrollToTop from "./Components/ScrollToTop";
 import AboutPage from "./Pages/AboutPage";
 import ContactPage from "./Pages/ContactPage";
 import IndexPage from "./Pages/IndexPage";
@@ -31,10 +32,14 @@ function App() {
     location.pathname === "/signup" ||
     location.pathname === "/profile" ||
     location.pathname === "/forgot-password" ||
+    location.pathname === "/projects" ||
+    location.pathname.startsWith("/project/") ||
+    location.pathname.startsWith("/messages/") ||
     location.pathname === "/client-request";
 
   return (
     <>
+      <ScrollToTop />
       {!hideNavFooter && <Nav />}
 
       <Routes>

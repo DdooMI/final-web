@@ -287,7 +287,7 @@ function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-30 pb-10 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 pt-10 pb-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         {/* Header with navigation */}
         <div className="mb-6 flex justify-between items-center">

@@ -13,7 +13,7 @@ import {
 } from "../firebase/messages";
 
 function MessageDetailPage() {
-  const { user } = useAuth();
+  const { user,profile } = useAuth();
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
@@ -248,16 +248,18 @@ function MessageDetailPage() {
                   {/* Show user's own avatar for their messages */}
                   {message.senderId === user.uid && (
                     <div className="flex-shrink-0 ml-2">
-                      {user?.photoURL ? (
+                      {profile?.photoURL ? (
                         <img
                           className="h-8 w-8 rounded-full object-cover"
-                          src={user.photoURL}
+                          src={profile.photoURL}
                           alt="You"
                         />
                       ) : (
-                        <div className="h-8 w-8 rounded-full bg-[#C19A6B]/20 flex items-center justify-center">
-                          <FaUser className="h-4 w-4 text-[#C19A6B]" />
-                        </div>
+                        <img
+                        className="h-8 w-8 rounded-full object-cover"
+                        src={"/person.gif"}
+                        alt="You"
+                      />
                       )}
                     </div>
                   )}
