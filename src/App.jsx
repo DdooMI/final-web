@@ -24,6 +24,7 @@ import ClientDesignersPage from "./Desgin pages/ClientDesignersPage";
 import DesignerRequestsPage from "./Desgin pages/DesignerRequestsPage";
 import DesignerProposalsPage from "./Desgin pages/DesignerProposalsPage";
 import DesignerPortfolioPage from "./Desgin pages/DesignerPortfolioPage";
+import PaymentPage from "./Pages/PaymentPage";
 
 function App() {
   const location = useLocation();
@@ -68,6 +69,8 @@ function App() {
           path="/designer-portfolio/:designerId"
           element={<DesignerPortfolioPage />}
         />
+
+<Route path="/payment" element={<PaymentPage />} />
       </Routes>
 
       {!hideNavFooter && <Footer />}
