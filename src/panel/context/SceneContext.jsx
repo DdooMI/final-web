@@ -2,25 +2,62 @@ import { createContext, useContext, useReducer } from 'react'
 
 const SceneContext = createContext()
 
-const initialState = {
-  objects: [],
-  walls: [],
-  floors: [],
-  history: [],
-  currentStep: -1,
-  activeShape: null,
-  activeColor: '#808080', // Default color for shapes
-  isRotationEnabled: true, // Camera rotation state
-  selectedFurnitureId: null, // Track selected furniture item
-  occupiedGridCells: {}, // Make sure this is initialized as an empty object
-  houseDimensions: {
-    width: 0,
-    length: 0,
-    height: 3,
-    isApplied: false,
-    error: null // Add error field
+// Load initial state from localStorage or use default values
+const loadInitialState = () => {
+  const savedState = localStorage.getItem('homeDesign')
+  if (savedState) {
+    const parsed = JSON.parse(savedState)
+    return {
+      objects: parsed.objects || [],
+      walls: parsed.walls || [],
+      floors: parsed.floors || [],
+      history: [],
+      currentStep: -1,
+      activeShape: null,
+      activeColor: '#808080',
+      isRotationEnabled: true,
+      selectedFurnitureId: null,
+      occupiedGridCells: {},
+      houseDimensions: {
+        width: 0,
+        length: 0,
+        height: 3,
+        isApplied: false,
+        error: null
+      },
+      metadata: parsed.metadata || {
+        lastImport: null,
+        lastExport: null
+      }
+    }
+  }
+  return {
+    objects: [],
+    walls: [],
+    floors: [],
+    history: [],
+    currentStep: -1,
+    activeShape: null,
+    activeColor: '#808080',
+    isRotationEnabled: true,
+    selectedFurnitureId: null,
+    occupiedGridCells: {},
+    houseDimensions: {
+      width: 0,
+      length: 0,
+      height: 3,
+      isApplied: false,
+      error: null
+    },
+    metadata: {
+      lastImport: null,
+      lastExport: null
+    }
   }
 }
+
+const initialState = loadInitialState()
+
 
 function sceneReducer(state, action) {
   switch (action.type) {
@@ -322,6 +359,15 @@ function sceneReducer(state, action) {
         return newState
       }
       return state
+    case 'SET_METADATA':
+      return {
+        ...state,
+        metadata: {
+          ...state.metadata,
+          ...action.payload
+        }
+      }
+      
     default:
       return state
   }

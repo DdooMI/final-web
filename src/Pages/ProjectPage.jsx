@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
+import { useBalance } from "../zustand/balance";
 import {
   doc,
   getDoc,
@@ -14,12 +15,17 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { createNotification } from "../firebase/notifications";
-import { FiMessageSquare, FiCheck, FiX, FiSettings } from "react-icons/fi";
+import { transferFundsToDesigner } from "../supabase/storage";
+import { FiMessageSquare, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiDollarSign } from "react-icons/fi";
 import { formatDistanceToNow } from "date-fns";
+import ModelUploader from "../Components/ModelUploader";
+import ModelDownloader from "../Components/ModelDownloader";
+import DesignerRating from "../Components/DesignerRating";
 
 function ProjectPage() {
   const { proposalId } = useParams();
   const { user, role } = useAuth();
+  const { balance, fetchBalance } = useBalance();
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
@@ -31,6 +37,15 @@ function ProjectPage() {
   const [projectStatus, setProjectStatus] = useState("in_progress"); // in_progress, completed_by_designer, completed
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [transferSuccess, setTransferSuccess] = useState(false);
+  const [modelFiles, setModelFiles] = useState([]);
+
+  useEffect(() => {
+    if (user && user.uid) {
+      fetchBalance(user.uid);
+    }
+  }, [user, fetchBalance]);
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -127,6 +142,11 @@ function ProjectPage() {
         if (proposalData.projectStatus) {
           setProjectStatus(proposalData.projectStatus);
         }
+        
+        // Get model files if any
+        if (proposalData.modelFiles) {
+          setModelFiles(proposalData.modelFiles);
+        }
       } catch (err) {
         console.error("Error fetching project data:", err);
         setError(err.message);
@@ -198,6 +218,27 @@ function ProjectPage() {
         });
       }
       
+      // Transfer funds from client to designer
+      if (proposal.price) {
+        try {
+          await transferFundsToDesigner(
+            proposal.clientId,
+            proposal.designerId,
+            parseFloat(proposal.price)
+          );
+          setTransferSuccess(true);
+          
+          // Refresh client's balance
+          if (role === 'client' && user && user.uid) {
+            fetchBalance(user.uid);
+          }
+        } catch (transferError) {
+          console.error('Error transferring funds:', transferError);
+          // Continue with completion even if transfer fails
+          // We'll handle this separately
+        }
+      }
+      
       // Create notification for designer
       await createNotification({
         userId: proposal.designerId,
@@ -210,6 +251,9 @@ function ProjectPage() {
       // Update local state
       setProjectStatus("completed");
       
+      // Show rating form
+      setShowRatingForm(true);
+      
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (err) {
@@ -217,6 +261,34 @@ function ProjectPage() {
     } finally {
       setUpdateLoading(false);
     }
+  };
+  
+  // Handle model upload success
+  const handleModelUploadSuccess = (fileInfo) => {
+    // Update local state with the new file
+    setModelFiles(prev => [
+      ...prev,
+      {
+        fileId: fileInfo.fileId,
+        fileName: fileInfo.fileName,
+        url: fileInfo.url,
+        uploadedAt: new Date(),
+        size: 0 // Size info might not be available
+      }
+    ]);
+    
+    // Update project status
+    setProjectStatus('completed_by_designer');
+    
+    // Show success message
+    setUpdateSuccess(true);
+    setTimeout(() => setUpdateSuccess(false), 3000);
+  };
+  
+  // Handle rating submission
+  const handleRatingSubmit = (ratingData) => {
+    // Hide the rating form after submission
+    setShowRatingForm(false);
   };
 
   // Start a conversation with the other party
@@ -286,6 +358,33 @@ function ProjectPage() {
     );
   }
 
+  // Helper functions for status display
+  function getStatusBadgeClass(status) {
+    switch (status) {
+      case "in_progress":
+        return "bg-blue-100 text-blue-800";
+      case "completed_by_designer":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  }
+
+  function getStatusLabel(status) {
+    switch (status) {
+      case "in_progress":
+        return "In Progress";
+      case "completed_by_designer":
+        return "Ready for Review";
+      case "completed":
+        return "Completed";
+      default:
+        return "Unknown Status";
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pt-10 pb-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -298,6 +397,11 @@ function ProjectPage() {
             <p className="text-gray-600 mt-1">
               {role === "client" ? "Designer" : "Client"}: {role === "client" ? designer?.name || designer?.email : client?.name || client?.email}
             </p>
+            {transferSuccess && (
+              <p className="text-green-600 mt-1 flex items-center">
+                <FiDollarSign className="mr-1" /> Payment successfully transferred
+              </p>
+            )}
           </div>
           <div className="flex space-x-3">
             <button
@@ -327,13 +431,45 @@ function ProjectPage() {
         )}
 
         {/* Project Status Banner */}
-        <div className={`mb-6 p-4 rounded-lg ${getStatusBannerClass(projectStatus)}`}>
+        <div className={`mb-6 p-4 rounded-lg ${projectStatus === "in_progress" ? "bg-blue-50 text-blue-700" : projectStatus === "completed_by_designer" ? "bg-yellow-50 text-yellow-700" : "bg-green-50 text-green-700"}`}>
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-semibold text-lg">{getStatusTitle(projectStatus)}</h2>
-              <p>{getStatusDescription(projectStatus, role)}</p>
+              <h2 className="font-semibold text-lg">
+                {projectStatus === "in_progress" ? "Project In Progress" : 
+                 projectStatus === "completed_by_designer" ? "Ready for Review" : 
+                 "Project Completed"}
+              </h2>
+              <p>
+                {projectStatus === "in_progress" ? 
+                  "The designer is currently working on your project." : 
+                 projectStatus === "completed_by_designer" ? 
+                  (role === "client" ? "The designer has completed the project. Please review and confirm completion." : "Waiting for client to review and confirm completion.") : 
+                  "This project has been completed successfully."}
+              </p>
             </div>
-            {renderStatusActions()}
+            
+            {/* Status Actions */}
+            <div>
+              {role === "designer" && projectStatus === "in_progress" && (
+                <button
+                  onClick={handleMarkAsCompletedByDesigner}
+                  disabled={updateLoading}
+                  className={`px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors ${updateLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {updateLoading ? "Updating..." : "Mark as Completed"}
+                </button>
+              )}
+              
+              {role === "client" && projectStatus === "completed_by_designer" && (
+                <button
+                  onClick={handleMarkAsCompleted}
+                  disabled={updateLoading}
+                  className={`px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors ${updateLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {updateLoading ? "Updating..." : "Confirm Completion"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -341,6 +477,28 @@ function ProjectPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Column - Request Details */}
           <div className="md:col-span-2">
+            
+            {/* Model Files Section */}
+            {role === "designer" && projectStatus !== "completed" ? (
+              <ModelUploader 
+                designerId={user.uid} 
+                projectId={proposalId}
+                onUploadSuccess={handleModelUploadSuccess}
+                onUploadError={(err) => setError(err.message)}
+              />
+            ) : (
+              <ModelDownloader modelFiles={modelFiles} />
+            )}
+            
+            {/* Rating Form - Only show for clients after project completion */}
+            {role === "client" && projectStatus === "completed" && showRatingForm && (
+              <DesignerRating 
+                clientId={user.uid}
+                designerId={proposal?.designerId}
+                projectId={proposalId}
+                onRatingSubmit={handleRatingSubmit}
+              />
+            )}
             <div className="bg-white shadow rounded-lg p-6 mb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Project Details</h2>
               

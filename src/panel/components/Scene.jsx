@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { useScene } from '../context/SceneContext'
 import FurnitureModel from './FurnitureModel'
 
+
 function Wall({ start, end, height = 3, width = 0.2, color = '#808080', opacity = 1 }) {
   const wallRef = useRef()
   const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.z - start.z, 2))
@@ -56,14 +57,9 @@ function FurniturePreview({ position, modelPath, isValid, rotation, scale }) {
   
   // Apply specific position adjustments for each furniture type
   if (furnitureType === 'sofa') {
-    // Position sofa to align with grid
-    adjustedPosition.y = 0;
     // Center the sofa horizontally in its grid cells
     adjustedPosition.x = position.x + 0.5;
-    adjustedPosition.z = position.z;
   } else if (furnitureType === 'chair') {
-    // Position chair to align with grid
-    adjustedPosition.y = 0;
     // Center the chair in its grid cell
     adjustedPosition.x = position.x + 0.5;
     adjustedPosition.z = position.z + 0.1;
@@ -128,10 +124,9 @@ export default function Scene() {
   useEffect(() => {
     if (state.activeShape === 'furniture' && state.selectedFurnitureId) {
       const furnitureCategories = {
-        bed: 'src/panel/models/bed.glb',
-        ikea_bed: 'src/panel/models/ikea_idanas_single_bed.glb',
-        chair: 'src/panel/models/chair.glb',
-        sofa: 'src/panel/models/sofa.glb'
+        ikea_bed: 'src/models/ikea_idanas_single_bed.glb',
+        chair: 'src/models/chair.glb',
+        sofa: 'src/models/sofa.glb'
       }
       
       const modelPath = furnitureCategories[state.selectedFurnitureId]
@@ -141,10 +136,7 @@ export default function Scene() {
         let furnitureScale;
         
         switch(state.selectedFurnitureId) {
-          case 'bed':
-            furnitureSize = { width: 2, length: 2 };
-            furnitureScale = 1;
-            break;
+          
           case 'ikea_bed':
             furnitureSize = { width: 1, length: 2 };
             furnitureScale = 1;
@@ -204,22 +196,34 @@ export default function Scene() {
   }, [])
 
   const snapToGrid = (point, isFloor = false) => {
-    // For floors, snap to grid cell centers
-    // For walls, snap to exact grid lines (whole numbers)
-    const gridX = isFloor 
-      ? Math.floor(point.x) + 0.5 
-      : Math.round(point.x)
-    const gridZ = isFloor 
-      ? Math.floor(point.z) + 0.5
-      : Math.round(point.z)
-    
     // Calculate grid boundaries based on center position
     const halfWidth = gridWidth / 2
     const halfLength = gridLength / 2
     
-    // Ensure the point is within the grid boundaries (centered at origin)
-    const boundedX = Math.max(-halfWidth + 0.5, Math.min(gridX, halfWidth - 0.5))
-    const boundedZ = Math.max(-halfLength + 0.5, Math.min(gridZ, halfLength - 0.5))
+    // For floors, snap to grid cell centers
+    // For walls, snap to exact grid lines (whole numbers)
+    let gridX = isFloor 
+      ? Math.floor(point.x) + 0.5 
+      : Math.round(point.x)
+    let gridZ = isFloor 
+      ? Math.floor(point.z) + 0.5
+      : Math.round(point.z)
+    
+    // Ensure the point is strictly within the grid boundaries (centered at origin)
+    // Clamp values to ensure they stay within grid boundaries
+    if (isFloor) {
+      // For floors, keep within the inner grid cells
+      gridX = Math.max(-halfWidth + 0.5, Math.min(gridX, halfWidth - 0.5))
+      gridZ = Math.max(-halfLength + 0.5, Math.min(gridZ, halfLength - 0.5))
+    } else {
+      // For walls, allow drawing on the grid boundaries but not outside
+      gridX = Math.max(-halfWidth, Math.min(gridX, halfWidth))
+      gridZ = Math.max(-halfLength, Math.min(gridZ, halfLength))
+    }
+    
+    // Use the clamped values directly
+    const boundedX = gridX
+    const boundedZ = gridZ
     
     // Return the point snapped to grid lines or cell centers
     return {
@@ -307,13 +311,25 @@ export default function Scene() {
   }
 
   const snapToVerticalOrHorizontal = (start, end) => {
+    // Calculate differences in x and z coordinates
     const dx = Math.abs(end.x - start.x)
     const dz = Math.abs(end.z - start.z)
-
+    
+    // Calculate grid boundaries
+    const halfWidth = gridWidth / 2
+    const halfLength = gridLength / 2
+    
+    // Determine if the wall should be vertical or horizontal
     if (dx < dz) {
-      return { x: start.x, z: end.z }
+      // Vertical wall (constant x)
+      // Ensure z is within grid boundaries
+      const boundedZ = Math.max(-halfLength, Math.min(end.z, halfLength))
+      return { x: start.x, z: boundedZ }
     } else {
-      return { x: end.x, z: start.z }
+      // Horizontal wall (constant z)
+      // Ensure x is within grid boundaries
+      const boundedX = Math.max(-halfWidth, Math.min(end.x, halfWidth))
+      return { x: boundedX, z: start.z }
     }
   }
 
@@ -337,14 +353,26 @@ export default function Scene() {
     } else if (isDrawing && drawingPoints.length > 0) {
       // First snap to grid, then align to vertical/horizontal
       const gridAlignedPoint = snapToGrid(snappedPoint)
+      
+      // Ensure both the start and end points are within grid boundaries
+      const halfWidth = gridWidth / 2
+      const halfLength = gridLength / 2
+      
+      // Ensure start point is within boundaries
+      const boundedStart = {
+        x: Math.max(-halfWidth, Math.min(drawingPoints[0].x, halfWidth)),
+        z: Math.max(-halfLength, Math.min(drawingPoints[0].z, halfLength))
+      }
+      
+      // Get the aligned point (vertical or horizontal wall)
       const alignedPoint = (state.activeShape === 'wall' || state.activeShape === 'line')
-        ? snapToVerticalOrHorizontal(drawingPoints[0], gridAlignedPoint)
+        ? snapToVerticalOrHorizontal(boundedStart, gridAlignedPoint)
         : gridAlignedPoint
       setMousePosition(alignedPoint)
 
       // If we're drawing a wall, show preview
       if (state.activeShape === 'wall' && drawingPoints.length > 0) {
-        const previewStart = drawingPoints[drawingPoints.length - 1]
+        const previewStart = boundedStart
         const previewEnd = alignedPoint
         return (
           <Wall
@@ -377,14 +405,26 @@ export default function Scene() {
     if (state.activeShape === 'wall' || state.activeShape === 'line') {
       // For walls, use the current mouse position (snapped to grid lines and aligned) as the endpoint
       const snappedPoint = snapToGrid(intersectionPoint, false)
+      
+      // Ensure both the start and end points are within grid boundaries
+      const halfWidth = gridWidth / 2
+      const halfLength = gridLength / 2
+      
+      // Ensure start point is within boundaries
+      const boundedStart = {
+        x: Math.max(-halfWidth, Math.min(drawingPoints[0].x, halfWidth)),
+        z: Math.max(-halfLength, Math.min(drawingPoints[0].z, halfLength))
+      }
+      
+      // Get the aligned point (vertical or horizontal wall)
       const alignedPoint = (state.activeShape === 'wall' || state.activeShape === 'line')
-        ? snapToVerticalOrHorizontal(drawingPoints[0], snappedPoint)
+        ? snapToVerticalOrHorizontal(boundedStart, snappedPoint)
         : snappedPoint
 
       dispatch({
         type: state.activeShape === 'wall' ? 'ADD_WALL' : 'ADD_LINE',
         payload: {
-          start: drawingPoints[0],
+          start: boundedStart,
           end: alignedPoint,
           layerId: state.activeLayer,
           color: state.activeColor
@@ -453,33 +493,31 @@ export default function Scene() {
     // Calculate the actual size based on rotation
     const actualSize = rotation % Math.PI === 0 ? size : { width: size.length, length: size.width };
     
-    // Check grid boundaries
-    const halfWidth = state.houseDimensions?.width / 2 || 10;
-    const halfLength = state.houseDimensions?.length / 2 || 10;
+    // Use the same grid dimensions as defined in the component
+    const halfWidth = gridWidth / 2;
+    const halfLength = gridLength / 2;
     
     // Check if furniture would be placed outside the grid
+    // Allow placement at the exact grid boundaries
+    // Special handling for the north border (top of the grid)
     if (position.x < -halfWidth || position.x + actualSize.width > halfWidth ||
         position.z < -halfLength || position.z + actualSize.length > halfLength) {
-      return false;
-    }
-    
-    // Create furniture bounding box
-    const furnitureBounds = {
-      minX: position.x,
-      maxX: position.x + actualSize.width,
-      minZ: position.z,
-      maxZ: position.z + actualSize.length
-    };
-    
-    // Check for collision with walls
-    if (state.walls && state.walls.length > 0) {
-      for (const wall of state.walls) {
-        if (wallIntersectsFurniture(wall, furnitureBounds)) {
-          return false;
-        }
+      // Check if position is at any grid boundary with a small tolerance for floating point precision
+      const isAtNorthBorder = Math.abs(position.z + actualSize.length ) < 0.001;
+      const isAtSouthBorder = Math.abs(position.z - (-halfLength)) < 0.001;
+      const isAtEastBorder = Math.abs(position.x + actualSize.width - halfWidth) < 0.001;
+      const isAtWestBorder = Math.abs(position.x - (-halfWidth)) < 0.001;
+      
+      // Allow placement if it's exactly at any boundary
+      if (isAtNorthBorder || isAtSouthBorder || isAtEastBorder || isAtWestBorder) {
+        // This is fine - exactly at the boundary
+      } else {
+        return false;
       }
     }
     
+
+
     // Check all grid cells that would be occupied by this furniture
     for (let x = 0; x < actualSize.width; x++) {
       for (let z = 0; z < actualSize.length; z++) {
@@ -497,118 +535,10 @@ export default function Scene() {
     return true;
   };
 
-  // Simplified wall-furniture intersection check
-  const wallIntersectsFurniture = (wall, furnitureBounds) => {
-    // Wall is defined by start and end points
-    const start = wall.start;
-    const end = wall.end;
-    
-    // Wall thickness
-    const thickness = wall.width || 0.2;
-    
-    // For horizontal walls (same Z)
-    if (Math.abs(start.z - end.z) < 0.1) {
-      const wallZ = start.z;
-      const minX = Math.min(start.x, end.x) - thickness/2;
-      const maxX = Math.max(start.x, end.x) + thickness/2;
-      
-      // Check if furniture overlaps with horizontal wall
-      if (furnitureBounds.minZ - thickness/2 <= wallZ && furnitureBounds.maxZ + thickness/2 >= wallZ) {
-        if (!(furnitureBounds.maxX < minX || furnitureBounds.minX > maxX)) {
-          return true;
-        }
-      }
-    }
-    
-    // For vertical walls (same X)
-    if (Math.abs(start.x - end.x) < 0.1) {
-      const wallX = start.x;
-      const minZ = Math.min(start.z, end.z) - thickness/2;
-      const maxZ = Math.max(start.z, end.z) + thickness/2;
-      
-      // Check if furniture overlaps with vertical wall
-      if (furnitureBounds.minX - thickness/2 <= wallX && furnitureBounds.maxX + thickness/2 >= wallX) {
-        if (!(furnitureBounds.maxZ < minZ || furnitureBounds.minZ > maxZ)) {
-          return true;
-        }
-      }
-    }
-    
-    // For diagonal walls, we'll use a more general approach
-    if (Math.abs(start.x - end.x) >= 0.1 && Math.abs(start.z - end.z) >= 0.1) {
-      // Check if any corner of the furniture is too close to the wall line
-      const corners = [
-        { x: furnitureBounds.minX, z: furnitureBounds.minZ },
-        { x: furnitureBounds.maxX, z: furnitureBounds.minZ },
-        { x: furnitureBounds.minX, z: furnitureBounds.maxZ },
-        { x: furnitureBounds.maxX, z: furnitureBounds.maxZ }
-      ];
-      
-      for (const corner of corners) {
-        const dist = pointToLineDistance(corner, start, end);
-        if (dist < thickness/2 + 0.1) {
-          return true;
-        }
-      }
-      
-      // Also check if the wall passes through the furniture
-      const wallPoints = [
-        { x: start.x, z: start.z },
-        { x: end.x, z: end.z }
-      ];
-      
-      for (const point of wallPoints) {
-        if (point.x >= furnitureBounds.minX && point.x <= furnitureBounds.maxX &&
-            point.z >= furnitureBounds.minZ && point.z <= furnitureBounds.maxZ) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  };
+  
 
   // Helper function to calculate distance from a point to a line segment
-  const pointToLineDistance = (point, lineStart, lineEnd) => {
-    const dx = lineEnd.x - lineStart.x;
-    const dz = lineEnd.z - lineStart.z;
-    
-    // If the line is just a point, return distance to that point
-    if (dx === 0 && dz === 0) {
-      return Math.sqrt(
-        Math.pow(point.x - lineStart.x, 2) + 
-        Math.pow(point.z - lineStart.z, 2)
-      );
-    }
-    
-    // Calculate projection of point onto line
-    const t = ((point.x - lineStart.x) * dx + (point.z - lineStart.z) * dz) / 
-              (dx * dx + dz * dz);
-    
-    // If projection is outside the line segment, use distance to nearest endpoint
-    if (t < 0) {
-      return Math.sqrt(
-        Math.pow(point.x - lineStart.x, 2) + 
-        Math.pow(point.z - lineStart.z, 2)
-      );
-    }
-    if (t > 1) {
-      return Math.sqrt(
-        Math.pow(point.x - lineEnd.x, 2) + 
-        Math.pow(point.z - lineEnd.z, 2)
-      );
-    }
-    
-    // Calculate the closest point on the line
-    const closestX = lineStart.x + t * dx;
-    const closestZ = lineStart.z + t * dz;
-    
-    // Return the distance to the closest point
-    return Math.sqrt(
-      Math.pow(point.x - closestX, 2) + 
-      Math.pow(point.z - closestZ, 2)
-    );
-  };
+
 
   return (
     <>
@@ -646,44 +576,48 @@ export default function Scene() {
           <Floor key={index} {...floor} />
         ))}
 
-        {/* Render placed furniture */}
-        {state.objects.filter(obj => obj.modelPath).map((furniture, index) => {
-          // Determine furniture type from model path
-          const furnitureType = furniture.modelPath.includes('chair') ? 'chair' : 
-                                furniture.modelPath.includes('sofa') ? 'sofa' : 
-                                furniture.modelPath.includes('ikea_bed') ? 'ikea_bed' : 'bed';
+        {/* Render placed furniture and imported 3D models */}
+        {state.objects.map((object, index) => {
+         
           
-          // Create a new position object with proper coordinates
-          const adjustedPosition = { 
-            x: furniture.position.x, 
-            y: 0, 
-            z: furniture.position.z 
-          };
           
-          // Apply specific position adjustments for each furniture type
-          if (furnitureType === 'sofa') {
-            // Position sofa to align with grid
-            adjustedPosition.y = 0;
-            // Center the sofa horizontally in its grid cells
-            adjustedPosition.x = furniture.position.x + 0.5;
-             adjustedPosition.z = furniture.position.z ;
-          } else if (furnitureType === 'chair') {
-            // Position chair to align with grid
-            adjustedPosition.y = 0;
-            // Center the chair in its grid cell
-            adjustedPosition.x = furniture.position.x +0.5 ;
-            adjustedPosition.z = furniture.position.z +0.1;
+          // Handle regular furniture models
+          if (object.modelPath) {
+            // Determine furniture type from model path
+            const furnitureType = object.modelPath.includes('chair') ? 'chair' : 
+                                  object.modelPath.includes('sofa') ? 'sofa' : 
+                                  object.modelPath.includes('ikea_bed') ? 'ikea_bed' : 'bed';
+            
+            // Create a new position object with proper coordinates
+            const adjustedPosition = { 
+              x: object.position.x, 
+              y: 0, 
+              z: object.position.z 
+            };
+            
+            // Apply specific position adjustments for each furniture type
+            if (furnitureType === 'sofa') {
+              // Center the sofa horizontally in its grid cells
+              adjustedPosition.x = object.position.x + 0.5;
+            } else if (furnitureType === 'chair') {
+              // Center the chair in its grid cell
+              adjustedPosition.x = object.position.x + 0.5;
+              adjustedPosition.z = object.position.z + 0.1;
+            }
+            
+            return (
+              <FurnitureModel
+                key={object.id || index}
+                modelPath={object.modelPath}
+                position={adjustedPosition}
+                rotation={object.rotation ? [0, object.rotation, 0] : [0, 0, 0]}
+                scale={object.scale || 1}
+              />
+            );
           }
           
-          return (
-            <FurnitureModel
-              key={furniture.id || index}
-              modelPath={furniture.modelPath}
-              position={adjustedPosition}
-              rotation={furniture.rotation ? [0, furniture.rotation, 0] : [0, 0, 0]}
-              scale={furniture.scale || 1}
-            />
-          );
+          // Return null for objects that don't match any rendering criteria
+          return null;
         })}
         
         {/* Render furniture preview */}

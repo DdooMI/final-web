@@ -1,11 +1,34 @@
 import { useScene } from '../context/SceneContext'
-import { useState, useEffect } from 'react'
-
-
+import { useEffect } from 'react'
 
 export default function TopBar() {
   const { state, dispatch } = useScene()
 
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    // Save the current state to localStorage
+    const saveStateToLocalStorage = () => {
+      const stateToSave = {
+        objects: state.objects,
+        walls: state.walls,
+        floors: state.floors,
+        
+      }
+      localStorage.setItem('homeDesign', JSON.stringify(stateToSave))
+      console.log('State saved to localStorage')
+    }
+
+    // Save state when component mounts and when state changes
+    saveStateToLocalStorage()
+
+    // Add event listener for beforeunload to save state when page refreshes
+    window.addEventListener('beforeunload', saveStateToLocalStorage)
+
+    // Clean up event listener
+    return () => {
+      window.removeEventListener('beforeunload', saveStateToLocalStorage)
+    }
+  }, [state.objects, state.walls, state.floors, ])
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
@@ -13,14 +36,6 @@ export default function TopBar() {
 
   const handleRedo = () => {
     dispatch({ type: 'REDO' })
-  }
-
-  const handleSave = () => {
-    localStorage.setItem('homeDesign', JSON.stringify({
-      objects: state.objects,
-      walls: state.walls,
-      floors: state.floors
-    }))
   }
 
   return (
@@ -45,16 +60,6 @@ export default function TopBar() {
         </svg>
         Redo
       </button>
-      <button 
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 transition-all duration-300 ease-in-out shadow-md hover:shadow-lg active:scale-95 transform"
-        onClick={handleSave}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:scale-110" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-        </svg>
-        Save
-      </button>
-
     </div>
   )
 }

@@ -34,6 +34,7 @@ function App() {
     location.pathname === "/profile" ||
     location.pathname === "/forgot-password" ||
     location.pathname === "/projects" ||
+    location.pathname === "/payment" ||
     location.pathname.startsWith("/project/") ||
     location.pathname.startsWith("/messages/") ||
     location.pathname === "/client-request";
@@ -47,7 +48,7 @@ function App() {
         <Route path="/" element={<IndexPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/project/:proposalId" element={<ProjectPage />} />
+        <Route path="/project/:proposalId" element={<ProjectPage />} />
         <Route path="/services" element={<ServicePage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<Login />} />
@@ -70,7 +71,7 @@ function App() {
           element={<DesignerPortfolioPage />}
         />
 
-<Route path="/payment" element={<PaymentPage />} />
+        <Route path="/payment" element={<PaymentPage />} />
       </Routes>
 
       {!hideNavFooter && <Footer />}

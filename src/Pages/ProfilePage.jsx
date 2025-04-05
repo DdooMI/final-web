@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
 import axiosApi from "../axios/axiosConfig";
+import UserBalance from "../payment/user-balance";
 
 export default function ProfilePage() {
   const { user, role, profile, updateProfile, logout } = useAuth();
@@ -188,6 +189,9 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* User Balance Section */}
+        <UserBalance />
 
         {/* Projects Section */}
         <div className="bg-white shadow rounded-lg">
