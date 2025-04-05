@@ -1,43 +1,20 @@
-import supabase from './supabaseConfig';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, updateDoc, arrayUnion, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from './firebaseConfig';
 
 // Constants
-const MODELS_BUCKET = 'models';
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 /**
- * Initialize the storage bucket if it doesn't exist
- * @returns {Promise<boolean>} - Whether initialization was successful
- */
-export const initializeStorage = async () => {
-  try {
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const modelsBucketExists = buckets?.some(bucket => bucket.name === MODELS_BUCKET);
-
-    if (!modelsBucketExists) {
-      const { error } = await supabase.storage.createBucket(MODELS_BUCKET, {
-        public: false,
-        fileSizeLimit: MAX_FILE_SIZE
-      });
-      if (error) throw error;
-    }
-    return true;
-  } catch (error) {
-    console.error('Storage initialization error:', error);
-    return false;
-  }
-};
-
-/**
- * Upload a 3D model file (.glb) to Supabase Storage
+ * Upload a design file (HTML or 3D model) to Firebase Storage
  * @param {File} file - The file object to upload
  * @param {string} designerId - The ID of the designer who created the model
  * @param {string} projectId - The ID of the project (proposal ID)
+ * @param {string} fileType - The type of file ('html' or '3d')
  * @returns {Promise<{url: string, fileName: string, fileId: string}>} - The download URL and metadata
  */
-export const uploadModelFile = async (file, designerId, projectId) => {
+export const uploadModelFile = async (file, designerId, projectId, fileType = 'html') => {
   try {
     if (!file || !designerId || !projectId) {
       throw new Error('Missing required parameters for file upload');
@@ -47,28 +24,27 @@ export const uploadModelFile = async (file, designerId, projectId) => {
       throw new Error(`File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`);
     }
 
-    if (!file.name.toLowerCase().endsWith('.glb')) {
-      throw new Error('Only .glb 3D model files are supported');
+    // Validate file extension based on type
+    const isValidFile = fileType === 'html' 
+      ? (file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm'))
+      : file.name.toLowerCase().endsWith('.glb');
+      
+    if (!isValidFile) {
+      throw new Error(`Only ${fileType === 'html' ? '.html/.htm' : '.glb'} files are supported`);
     }
 
     const fileId = uuidv4();
     const fileName = `${fileId}_${file.name}`;
-    const filePath = `${designerId}/${projectId}/${fileName}`;
-
-    // Upload file to Supabase storage
-    const { error: uploadError } = await supabase.storage
-      .from(MODELS_BUCKET)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    // Get the public URL for the file
-    const { data: { publicUrl } } = supabase.storage
-      .from(MODELS_BUCKET)
-      .getPublicUrl(filePath);
+    const filePath = `models/${designerId}/${projectId}/${fileName}`;
+    
+    // Create a reference to the file location in Firebase Storage
+    const fileRef = ref(storage, filePath);
+    
+    // Upload file to Firebase Storage
+    await uploadBytes(fileRef, file);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(fileRef);
 
     // Store file metadata in Firestore
     const projectRef = doc(db, 'designProposals', projectId);
@@ -76,26 +52,27 @@ export const uploadModelFile = async (file, designerId, projectId) => {
       modelFiles: arrayUnion({
         fileId,
         fileName: file.name,
-        url: publicUrl,
+        url: downloadURL,
         uploadedAt: new Date(),
         size: file.size,
+        fileType: fileType // Store the file type
       }),
       projectStatus: 'completed_by_designer'
     });
 
     return {
-      url: publicUrl,
+      url: downloadURL,
       fileName: file.name,
       fileId
     };
   } catch (error) {
-    console.error('Error uploading model file:', error);
+    console.error('Error uploading file:', error);
     throw error;
   }
 };
 
 /**
- * Delete a model file from Supabase Storage
+ * Delete a model file from Firebase Storage
  * @param {string} designerId - The ID of the designer who created the model
  * @param {string} projectId - The ID of the project
  * @param {string} fileName - The name of the file to delete
@@ -103,14 +80,13 @@ export const uploadModelFile = async (file, designerId, projectId) => {
  */
 export const deleteModelFile = async (designerId, projectId, fileName) => {
   try {
-    const filePath = `${designerId}/${projectId}/${fileName}`;
-
-    // Delete the file from Supabase storage
-    const { error } = await supabase.storage
-      .from(MODELS_BUCKET)
-      .remove([filePath]);
-
-    if (error) throw error;
+    const filePath = `models/${designerId}/${projectId}/${fileName}`;
+    
+    // Create a reference to the file
+    const fileRef = ref(storage, filePath);
+    
+    // Delete the file from Firebase Storage
+    await deleteObject(fileRef);
 
     // Update Firestore to remove the file reference
     const projectRef = doc(db, 'designProposals', projectId);

@@ -20,7 +20,6 @@ export default function ProfilePage() {
     setImageFile(file);
     setFileName(file.name);
   };
-  const [activeTab, setActiveTab] = useState("all");
   const handleSave = async () => {
     try {
       if (!imageFile && newName === profile.name) {
@@ -198,28 +197,16 @@ export default function ProfilePage() {
           <div className="border-b">
             <div className="px-6 py-4 flex">
               <button
-                className={`px-4 py-2 font-medium text-sm ${
-                  activeTab === "all"
-                    ? "border-b-2 border-[#A67B5B] text-[#A67B5B]"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("all")}
+                className={`px-4 py-2 font-medium text-sm border-b-2 border-[#A67B5B] text-[#A67B5B]`}
               >
                 All Projects
               </button>
-              {role === "designer" ? (
-                <button
-                  className={`px-4 py-2 font-medium text-sm ${
-                    activeTab === "published"
-                      ? "border-b-2 border-[#A67B5B] text-[#A67B5B]"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                  onClick={() => setActiveTab("published")}
-                >
-                  Published Projects
-                </button>
-              ) : null}
             </div>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-500 text-center py-4">
+              Your projects will appear here
+            </p>
           </div>
         </div>
       </main>

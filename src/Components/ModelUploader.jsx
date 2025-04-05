@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
-import { FiUpload, FiFile, FiCheck, FiX } from 'react-icons/fi';
-import { uploadModelFile } from '../supabase/storage';
+import { FiUpload, FiFile, FiCheck, FiX, FiCode } from 'react-icons/fi';
+import { uploadModelFile } from '../firebase/storage';
 
 const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }) => {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
+  const [fileType, setFileType] = useState('html'); // Default to HTML files
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     
     if (!selectedFile) return;
     
-    // Check if file is a .glb file
-    if (!selectedFile.name.toLowerCase().endsWith('.glb')) {
-      setError('Only .glb 3D model files are supported');
+    // Check if file has valid extension based on selected type
+    const validExtension = fileType === 'html' 
+      ? selectedFile.name.toLowerCase().endsWith('.html') || selectedFile.name.toLowerCase().endsWith('.htm')
+      : selectedFile.name.toLowerCase().endsWith('.glb');
+    
+    if (!validExtension) {
+      setError(`Only ${fileType === 'html' ? '.html/.htm' : '.glb'} files are supported`);
       return;
     }
     
@@ -52,14 +57,14 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
       }, 500);
       
       // Upload file to Firebase Storage
-      const result = await uploadModelFile(file, designerId, projectId);
+      const result = await uploadModelFile(file, designerId, projectId, fileType);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
       
       // Call success callback with file info
       if (onUploadSuccess) {
-        onUploadSuccess(result);
+        onUploadSuccess({...result, fileType});
       }
       
       // Reset state after successful upload
@@ -80,8 +85,8 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <h3 className="text-lg font-semibold mb-4">Upload 3D Model</h3>
+    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <h3 className="text-xl font-semibold mb-4 text-gray-800">Upload Design File</h3>
       
       {error && (
         <div className="bg-red-50 text-red-600 p-3 rounded-md mb-4 flex items-center">
@@ -90,11 +95,38 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
         </div>
       )}
       
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#C19A6B] transition-colors">
+      <div className="mb-4">
+        <div className="flex border border-gray-300 rounded-md overflow-hidden">
+          <button
+            onClick={() => setFileType('html')}
+            className={`flex-1 py-2 px-4 flex items-center justify-center gap-2 ${
+              fileType === 'html' 
+                ? 'bg-[#C19A6B] text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            } transition-colors`}
+          >
+            <FiCode />
+            <span>HTML Design</span>
+          </button>
+          <button
+            onClick={() => setFileType('3d')}
+            className={`flex-1 py-2 px-4 flex items-center justify-center gap-2 ${
+              fileType === '3d' 
+                ? 'bg-[#C19A6B] text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            } transition-colors`}
+          >
+            <FiFile />
+            <span>3D Model</span>
+          </button>
+        </div>
+      </div>
+      
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#C19A6B] transition-colors bg-gray-50">
         <input
           type="file"
           id="model-file"
-          accept=".glb"
+          accept={fileType === 'html' ? '.html,.htm' : '.glb'}
           onChange={handleFileChange}
           className="hidden"
           disabled={isUploading}
@@ -103,16 +135,28 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
         {!file ? (
           <label
             htmlFor="model-file"
-            className="cursor-pointer flex flex-col items-center justify-center"
+            className="cursor-pointer flex flex-col items-center justify-center py-8"
           >
-            <FiUpload className="text-4xl text-gray-400 mb-2" />
-            <p className="text-gray-600 mb-1">Click to select a 3D model file (.glb)</p>
-            <p className="text-xs text-gray-500">Maximum file size: 50MB</p>
+            {fileType === 'html' ? (
+              <FiCode className="text-5xl text-gray-400 mb-3" />
+            ) : (
+              <FiUpload className="text-5xl text-gray-400 mb-3" />
+            )}
+            <p className="text-gray-600 mb-2 font-medium">
+              {fileType === 'html' 
+                ? 'Click to select an HTML design file (.html/.htm)' 
+                : 'Click to select a 3D model file (.glb)'}
+            </p>
+            <p className="text-sm text-gray-500">Maximum file size: 50MB</p>
           </label>
         ) : (
-          <div className="py-2">
+          <div className="py-4">
             <div className="flex items-center justify-center mb-3">
-              <FiFile className="text-2xl text-[#C19A6B] mr-2" />
+              {fileType === 'html' ? (
+                <FiCode className="text-2xl text-[#C19A6B] mr-2" />
+              ) : (
+                <FiFile className="text-2xl text-[#C19A6B] mr-2" />
+              )}
               <span className="font-medium truncate max-w-xs">{file.name}</span>
             </div>
             <p className="text-sm text-gray-500 mb-3">
@@ -121,9 +165,9 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
             
             {isUploading ? (
               <div className="w-full max-w-md mx-auto">
-                <div className="bg-gray-200 rounded-full h-2.5 mb-2">
+                <div className="bg-gray-200 rounded-full h-3 mb-2">
                   <div
-                    className="bg-[#C19A6B] h-2.5 rounded-full transition-all duration-300"
+                    className="bg-[#C19A6B] h-3 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   ></div>
                 </div>
@@ -144,7 +188,7 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
                   onClick={handleUpload}
                   className="px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors"
                 >
-                  Upload Model
+                  Upload File
                 </button>
                 <button
                   type="button"
@@ -160,7 +204,7 @@ const ModelUploader = ({ designerId, projectId, onUploadSuccess, onUploadError }
       </div>
       
       <div className="mt-4 text-sm text-gray-600">
-        <p>Supported format: .glb (3D model)</p>
+        <p>Supported format: {fileType === 'html' ? '.html/.htm (HTML Design)' : '.glb (3D model)'}</p>
         <p>This file will be available for the client to download once uploaded.</p>
       </div>
     </div>

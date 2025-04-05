@@ -1,213 +1,258 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../zustand/auth";
 import { useBalance } from "../zustand/balance";
 
-const PayPalButton = ({ amount, onSuccess, onError, onCancel, operationType = "deposit" }) => {
-  const paypalRef = useRef();
-  const { user, role } = useAuth();
-  const { addFunds, useBalance: withdrawFunds, balance } = useBalance();
+const PayPalButton = ({
+  amount,
+  operationType = "deposit", // "deposit" or "withdraw"
+  onSuccess = () => {},
+  onError = () => {},
+  onCancel = () => {}
+}) => {
+  const { user } = useAuth();
+  const { addFunds, useBalance: withdrawFunds } = useBalance();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paypalButtonRendered, setPaypalButtonRendered] = useState(false);
 
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
-  const [isScriptError, setIsScriptError] = useState(false);
+  // Convert amount to number
+  const numAmount = parseFloat(amount) || 0;
 
-  // Store PayPal button instance for proper cleanup
-  const paypalButtonInstance = useRef(null);
-  
-  // Script loading should not depend on amount, operationType, or balance
-  // to prevent unnecessary reloading of the PayPal SDK
   useEffect(() => {
-    // Check if script is already loaded
-    if (document.querySelector('script[src*="paypal.com/sdk/js"]')) {
-      setIsScriptLoaded(true);
-      return;
-    }
-    
-    // Load the PayPal SDK script
-    const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=AYOI8vTTXQHl9y_-l5YWHTZod8Gy3zRx6VSShln6waqDj28moDtzPR3uRIeMibomNEvKgsHseNf5ePJ9&currency=USD`;
-    script.async = true;
-    
-    script.addEventListener("load", () => {
-      setIsScriptLoaded(true);
-    });
-    
-    script.addEventListener("error", () => {
-      setIsScriptError(true);
-      onError("Failed to load PayPal SDK. Please try again later.");
-    });
-    
-    document.body.appendChild(script);
-
-    return () => {
-      // We don't remove the script on unmount as it might be used by other components
-      // and removing it could cause issues with PayPal button instances
-    };
-  }, []); // Only run once on component mount
-
-  const setupPayPalButton = () => {
-    // Ensure the PayPal SDK is available
-    if (!window.paypal) {
-      onError("PayPal SDK not available. Please refresh the page and try again.");
-      return;
-    }
-    
-    // Ensure the container element exists
-    if (!paypalRef.current) {
-      console.error("PayPal container element not found");
-      return;
-    }
-    
-    // Clear any existing PayPal buttons
-    paypalRef.current.innerHTML = '';
-    
-    // Validate amount before setting up PayPal button
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      onError("Please enter a valid amount");
-      return;
-    }
-    
-    // For withdrawal, check if user has enough balance
-    if (operationType === "withdraw" && numAmount > balance) {
-      onError("Insufficient balance for withdrawal");
-      return;
-    }
-    
-    // Check if user is authenticated
-    if (!user || !user.uid) {
-      onError("You must be logged in to perform this operation");
-      return;
-    }
-    
-    try {
-      // Close previous button instance if it exists
-      if (paypalButtonInstance.current) {
-        paypalButtonInstance.current.close();
-      }
+    // Function to load PayPal script
+    const loadPayPalScript = () => {
+      // First, remove any existing PayPal scripts
+      const existingScripts = document.querySelectorAll('script[src*="paypal.com/sdk/js"]');
+      existingScripts.forEach(script => script.remove());
       
-      // Create new button instance
-      paypalButtonInstance.current = window.paypal
-        .Buttons({
-          createOrder: (data, actions) => {
-            try {
-              return actions.order.create({
-                intent: "CAPTURE",
-                purchase_units: [
-                  {
-                    description: operationType === "deposit" 
-                      ? "Add funds to your account" 
-                      : "Withdraw funds from your account",
-                    amount: {
-                      currency_code: "USD",
-                      value: amount,
-                    },
-                  },
-                ],
-              });
-            } catch (err) {
-              console.error("PayPal createOrder error:", err);
-              onError("Failed to create PayPal order. Please try again.");
-              return null;
-            }
-          },
-          onApprove: async (data, actions) => {
-            try {
-              const order = await actions.order.capture();
-              console.log("PayPal order captured:", order);
-              
-              // Update user's balance in Firestore based on operation type
-              if (user && user.uid) {
-                try {
-                  let success;
-                  const numAmount = parseFloat(amount); // Define numAmount here
-                  
-                  if (operationType === "deposit") {
-                    success = await addFunds(user.uid, numAmount);
-                  } else {
-                    // Double-check balance again before withdrawal
-                    if (numAmount > balance) {
-                      onError("Insufficient balance for withdrawal");
-                      return;
-                    }
-                    success = await withdrawFunds(user.uid, numAmount);
-                  }
-                  
-                  if (success) {
-                    onSuccess(order);
-                  } else {
-                    onError(operationType === "deposit" 
-                      ? "Failed to add funds" 
-                      : "Failed to withdraw funds");
-                  }
-                } catch (error) {
-                  console.error("Balance update error:", error);
-                  onError("Failed to update balance");
-                }
-              } else {
-                onError("User not authenticated");
-              }
-            } catch (err) {
-              console.error("PayPal capture error:", err);
-              onError("Failed to complete payment. Please check your PayPal account and try again.");
-            }
-          },
-          onError: (err) => {
-            console.error("PayPal Error:", err);
-            onError("Payment failed: " + (err.message || "Please try again later."));
-          },
-          onCancel: () => {
-            onCancel();
-          },
-          style: {
-            layout: "vertical",
-            color: "blue",
-            shape: "rect",
-            label: "paypal",
-          },
-        });
-      
-      // Only render if the container is still in the DOM
-      if (paypalRef.current && document.body.contains(paypalRef.current)) {
-        paypalButtonInstance.current.render(paypalRef.current);
-      }
-    } catch (err) {
-      console.error("PayPal button render error:", err);
-      onError("Failed to initialize PayPal. Please refresh the page and try again.");
-    }
-  };
-
-  // Setup PayPal button when script is loaded and when relevant props change
-  useEffect(() => {
-    if (isScriptLoaded && !isScriptError && paypalRef.current) {
-      // Small delay to ensure DOM is stable before rendering PayPal button
-      const timer = setTimeout(() => {
-        setupPayPalButton();
-      }, 0);
-      
-      return () => {
-        clearTimeout(timer);
-        // Clean up PayPal button instance when component updates
-        if (paypalButtonInstance.current) {
-          try {
-            paypalButtonInstance.current.close();
-          } catch (err) {
-            console.error("Error closing PayPal button:", err);
-          }
+      // Remove any existing PayPal button containers
+      const existingContainers = document.querySelectorAll('.paypal-button-container');
+      existingContainers.forEach(container => {
+        if (container.hasChildNodes()) {
+          container.innerHTML = '';
         }
-      };
-    }
-  }, [amount, operationType, balance, isScriptLoaded, user]);
+      });
 
-  if (isScriptError) {
-    return <div className="text-red-500 text-center py-4">Failed to load PayPal. Please refresh the page.</div>;
-  }
+      // Create a new script element
+      const script = document.createElement('script');
+      script.src = 'https://www.paypal.com/sdk/js?client-id=AcwO7Xi1Xmofa84Ft9c_3ud-e-tSmbtrNfMym2wkPCwHhjedIagCoZQ_W7_q9k7Y84a5ecKEuKy-Fz2y&currency=USD';
+      script.async = true;
+      
+      // Set up script load handler
+      script.onload = () => {
+        console.log('PayPal script loaded successfully');
+        
+        // Wait a moment before rendering the button
+        setTimeout(() => {
+          renderPayPalButton();
+        }, 100);
+      };
+      
+      // Set up script error handler
+      script.onerror = (error) => {
+        console.error('PayPal script failed to load:', error);
+        onError('فشل تحميل PayPal');
+      };
+      
+      // Add the script to the document
+      document.body.appendChild(script);
+    };
+
+    // Function to render the PayPal button
+    const renderPayPalButton = () => {
+      // Check if PayPal SDK is loaded
+      if (!window.paypal || !window.paypal.Buttons) {
+        console.error('PayPal SDK not loaded properly');
+        onError('لم يتم تحميل PayPal بشكل صحيح');
+        return;
+      }
+      
+      // Get the container element
+      const container = document.getElementById('paypal-button-container');
+      if (!container) {
+        console.error('PayPal button container not found');
+        return;
+      }
+      
+      // Clear the container
+      container.innerHTML = '';
+      
+      try {
+        // Create and render the PayPal button
+        const button = window.paypal.Buttons({
+          // Button style
+          style: {
+            color: 'gold',
+            shape: 'rect',
+            label: 'paypal'
+          },
+          
+          // Create order
+          createOrder: (data, actions) => {
+            return actions.order.create({
+              purchase_units: [{
+                description: operationType === "deposit" 
+                  ? "إضافة رصيد إلى حسابك" 
+                  : "سحب رصيد من حسابك",
+                amount: {
+                  value: numAmount.toFixed(2)
+                }
+              }]
+            });
+          },
+          
+          // Handle approved payment
+          onApprove: (data, actions) => {
+            setIsProcessing(true);
+            
+            return actions.order.capture().then((details) => {
+              console.log('Payment completed:', details);
+              
+              if (user && user.uid) {
+                if (operationType === "deposit") {
+                  addFunds(user.uid, numAmount);
+                } else {
+                  withdrawFunds(user.uid, numAmount);
+                }
+                
+                onSuccess({
+                  transactionId: details.id,
+                  amount: numAmount,
+                  orderData: details
+                });
+              } else {
+                onError("خطأ في مصادقة المستخدم");
+              }
+              
+              setIsProcessing(false);
+            }).catch((err) => {
+              console.error('Error capturing order:', err);
+              setIsProcessing(false);
+              onError("حدث خطأ أثناء معالجة الدفع");
+            });
+          },
+          
+          // Handle canceled payment
+          onCancel: (data) => {
+            console.log('Payment canceled:', data);
+            onCancel("تم إلغاء الدفع");
+          },
+          
+          // Handle errors
+          onError: (err) => {
+            console.error('PayPal error:', err);
+            setIsProcessing(false);
+            onError("حدث خطأ في عملية الدفع");
+          }
+        });
+        
+        // Render the button
+        button.render(container);
+        console.log('PayPal button rendered successfully');
+        setPaypalButtonRendered(true);
+      } catch (error) {
+        console.error('Error rendering PayPal button:', error);
+        onError("حدث خطأ في عرض زر PayPal");
+      }
+    };
+
+    // Load the PayPal script
+    loadPayPalScript();
+    
+    // Clean up function
+    return () => {
+      const existingScripts = document.querySelectorAll('script[src*="paypal.com/sdk/js"]');
+      existingScripts.forEach(script => script.remove());
+    };
+  }, [numAmount, operationType, user, addFunds, withdrawFunds, onSuccess, onError, onCancel]);
 
   return (
-    <div>
-      {!isScriptLoaded && (
-        <div className="text-center py-4 text-gray-500">Loading PayPal...</div>
-      )}
-      <div ref={paypalRef} className="paypal-button-container"></div>
+    <div style={{ 
+      maxWidth: '500px', 
+      margin: '0 auto', 
+      padding: '20px',
+      backgroundColor: '#fff',
+      borderRadius: '8px',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+      position: 'relative'
+    }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 10px 0', color: '#2c2e2f' }}>
+          {operationType === "deposit" ? "إضافة رصيد عبر PayPal" : "سحب رصيد عبر PayPal"}
+        </h3>
+        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0070ba' }}>
+          ${numAmount.toFixed(2)}
+        </div>
+      </div>
+      
+      {/* PayPal Button Container */}
+      <div style={{ position: 'relative', minHeight: '55px' }}>
+        {/* Processing Overlay */}
+        {isProcessing && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              padding: '10px 20px',
+              backgroundColor: '#fff',
+              borderRadius: '5px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            }}>
+              جارٍ معالجة الدفع...
+            </div>
+          </div>
+        )}
+        
+        {/* PayPal Button */}
+        <div 
+          id="paypal-button-container" 
+          className="paypal-button-container"
+          style={{ 
+            minHeight: '45px',
+            zIndex: 1
+          }}
+        ></div>
+        
+        {/* Fallback message if button doesn't render */}
+        {!paypalButtonRendered && !isProcessing && (
+          <div style={{
+            padding: '15px',
+            textAlign: 'center',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '5px',
+            marginTop: '10px'
+          }}>
+            جارٍ تحميل خيارات الدفع...
+          </div>
+        )}
+      </div>
+      
+      {/* Footer */}
+      <div style={{ 
+        marginTop: '20px', 
+        textAlign: 'center',
+        fontSize: '12px',
+        color: '#666',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <img 
+          src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg" 
+          alt="PayPal" 
+          style={{ height: '23px', marginRight: '8px' }} 
+        />
+        <span>معاملات آمنة ومشفرة</span>
+      </div>
     </div>
   );
 };

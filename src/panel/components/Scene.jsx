@@ -1,22 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+/* eslint-disable react/no-unknown-property */
+/* eslint-disable react/prop-types */
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useDroppable } from '@dnd-kit/core'
-import { OrbitControls } from '@react-three/drei'
-import * as THREE from 'three'
-import { useScene } from '../context/SceneContext'
-import FurnitureModel from './FurnitureModel'
+import { useDroppable } from "@dnd-kit/core";
+import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import { useScene } from "../context/SceneContext";
+import FurnitureModel from "./FurnitureModel";
 
-
-function Wall({ start, end, height = 3, width = 0.2, color = '#808080', opacity = 1 }) {
-  const wallRef = useRef()
-  const length = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.z - start.z, 2))
-  const angle = Math.atan2(end.z - start.z, end.x - start.x)
+function Wall({
+  start,
+  end,
+  height = 3,
+  width = 0.2,
+  color = "#808080",
+  opacity = 1,
+}) {
+  const wallRef = useRef();
+  const length = Math.sqrt(
+    Math.pow(end.x - start.x, 2) + Math.pow(end.z - start.z, 2)
+  );
+  const angle = Math.atan2(end.z - start.z, end.x - start.x);
 
   useEffect(() => {
     if (wallRef.current) {
-      wallRef.current.rotation.y = angle
+      wallRef.current.rotation.y = angle;
     }
-  }, [angle])
+  }, [angle]);
 
   return (
     <mesh
@@ -26,497 +36,452 @@ function Wall({ start, end, height = 3, width = 0.2, color = '#808080', opacity 
       receiveShadow
     >
       <boxGeometry args={[length, height, width]} />
-      <meshStandardMaterial color={color} transparent={opacity < 1} opacity={opacity} />
+      <meshStandardMaterial
+        color={color}
+        transparent={opacity < 1}
+        opacity={opacity}
+      />
     </mesh>
-  )
+  );
 }
 
-function Floor({ position, size, length, color = '#808080' }) {
+function Floor({ position, size, length, color = "#808080" }) {
   const floorWidth = size;
   const floorLength = length || size;
   return (
-    <mesh position={[position.x, 0.01, position.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+    <mesh
+      position={[position.x, 0.01, position.z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      receiveShadow
+    >
       <planeGeometry args={[floorWidth, floorLength]} />
-      <meshStandardMaterial color={color} transparent opacity={0.7} side={THREE.DoubleSide} />
+      <meshStandardMaterial
+        color={color}
+        transparent
+        opacity={0.7}
+        side={THREE.DoubleSide}
+      />
     </mesh>
-  )
+  );
 }
 
 function FurniturePreview({ position, modelPath, isValid, rotation, scale }) {
   // Determine furniture type from model path
-  const furnitureType = modelPath.includes('chair') ? 'chair' : 
-                        modelPath.includes('sofa') ? 'sofa' : 
-                        modelPath.includes('ikea_bed') ? 'ikea_bed' : 'bed';
-  
+  const furnitureType = modelPath.includes("chair")
+    ? "chair"
+    : modelPath.includes("sofa")
+    ? "sofa"
+    : modelPath.includes("ikea_bed")
+    ? "ikea_bed"
+    : modelPath.includes("table")
+    ? "table"
+    : "bed";
+
   // Create a new position object with proper coordinates
-  const adjustedPosition = { 
-    x: position.x, 
-    y: 0, 
-    z: position.z 
+  const adjustedPosition = {
+    x: position.x,
+    y: 0,
+    z: position.z,
   };
-  
+
   // Apply specific position adjustments for each furniture type
-  if (furnitureType === 'sofa') {
+  if (furnitureType === "sofa") {
     // Center the sofa horizontally in its grid cells
     adjustedPosition.x = position.x + 0.5;
-  } else if (furnitureType === 'chair') {
+  } else if (furnitureType === "chair") {
     // Center the chair in its grid cell
     adjustedPosition.x = position.x + 0.5;
     adjustedPosition.z = position.z + 0.1;
   }
-  
+
   return (
     <FurnitureModel
       modelPath={modelPath}
       position={adjustedPosition}
       opacity={0.5}
-      color={isValid ? '#00ff00' : '#ff0000'}
+      color={isValid ? "#00ff00" : "#ff0000"}
       rotation={[0, rotation, 0]}
       scale={scale || 1}
     />
-  )
+  );
 }
 
 export default function Scene() {
-  const { state, dispatch } = useScene()
+  const { state, dispatch } = useScene();
   const { setNodeRef } = useDroppable({
-    id: 'scene',
+    id: "scene",
     data: {
-      accepts: ['shape']
-    }
-  })
-  const planeRef = useRef()
-  const [drawingPoints, setDrawingPoints] = useState([])
-  const [mousePosition, setMousePosition] = useState({ x: 0, z: 0 })
-  const [isDrawing, setIsDrawing] = useState(false)
-  const [isCurvedDrawing, setIsCurvedDrawing] = useState(false)
-  const [furniturePreview, setFurniturePreview] = useState(null)
-  const [previewRotation, setPreviewRotation] = useState(0)
+      accepts: ["shape"],
+    },
+  });
+  const planeRef = useRef();
+  const [drawingPoints, setDrawingPoints] = useState([]);
+  const [mousePosition, setMousePosition] = useState({ x: 0, z: 0 });
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [isCurvedDrawing, setIsCurvedDrawing] = useState(false);
+  const [furniturePreview, setFurniturePreview] = useState(null);
+  const [previewRotation, setPreviewRotation] = useState(0);
 
   // Handle keyboard events for furniture rotation
   useEffect(() => {
     const handleKeyPress = (event) => {
-      if (event.code === 'Space' && furniturePreview) {
-        event.preventDefault()
+      if (event.code === "Space" && furniturePreview) {
+        event.preventDefault();
         // Rotate 90 degrees clockwise
-        setPreviewRotation((prev) => (prev + Math.PI/2) % (Math.PI * 2))
+        setPreviewRotation((prev) => (prev + Math.PI / 2) % (Math.PI * 2));
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [furniturePreview])
+    // Ensure event listener is properly attached
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", handleKeyPress);
+      return () => window.removeEventListener("keydown", handleKeyPress);
+    }
+  }, [furniturePreview]);
+
+  // Ensure Three.js and scene are properly initialized with error handling and retry mechanism
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+
+    const initializeScene = () => {
+      try {
+        // Initialize Three.js scene
+        if (!window.THREE) {
+          throw new Error("Three.js not loaded");
+        }
+
+        // Force a re-render to ensure proper initialization
+        const timer = setTimeout(() => {
+          setMousePosition((prev) => ({ ...prev }));
+        }, 300);
+
+        // Initialize event handlers for the scene
+        const handleKeyDown = (event) => {
+          if (event.code === "Space" && furniturePreview) {
+            event.preventDefault();
+            setPreviewRotation((prev) => (prev + Math.PI / 2) % (Math.PI * 2));
+          }
+        };
+
+        // Add event listeners
+        window.addEventListener("keydown", handleKeyDown);
+
+        // Ensure proper cleanup
+        return () => {
+          clearTimeout(timer);
+          window.removeEventListener("keydown", handleKeyDown);
+        };
+      } catch (error) {
+        console.error(`Scene initialization error (attempt ${retryCount + 1}):`, error);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(initializeScene, retryDelay);
+        } else {
+          console.error("Failed to initialize scene after maximum retries");
+          dispatch({
+            type: "SET_ERROR",
+            payload: "فشل في تحميل المشهد. يرجى تحديث الصفحة والمحاولة مرة أخرى."
+          });
+        }
+      }
+    };
+
+    initializeScene();
+  }, [furniturePreview, dispatch]);
+
+
+  // Handle scene initialization errors
+  useEffect(() => {
+    const handleError = (error) => {
+      console.error("Scene initialization error:", error);
+    };
+
+    window.addEventListener("error", handleError);
+    return () => window.removeEventListener("error", handleError);
+  }, []);
 
   // Check if house dimensions have been applied
-  const houseDimensionsApplied = state.houseDimensions?.isApplied
-  
+  const houseDimensionsApplied = state.houseDimensions?.isApplied;
+
   // Clear scene when house dimensions are first applied
   useEffect(() => {
     if (houseDimensionsApplied) {
       dispatch({
-        type: 'SET_HOUSE_DIMENSIONS',
-        payload: { ...state.houseDimensions }
-      })
+        type: "SET_HOUSE_DIMENSIONS",
+        payload: { ...state.houseDimensions },
+      });
     }
-  }, [dispatch, houseDimensionsApplied, state.houseDimensions])
+  }, [dispatch, houseDimensionsApplied, state.houseDimensions]);
 
   // Initialize furniture preview when furniture is selected
   useEffect(() => {
-    if (state.activeShape === 'furniture' && state.selectedFurnitureId) {
+    if (state.activeShape === "furniture" && state.selectedFurnitureId) {
       const furnitureCategories = {
-        ikea_bed: 'src/models/ikea_idanas_single_bed.glb',
-        chair: 'src/models/chair.glb',
-        sofa: 'src/models/sofa.glb'
-      }
+        ikea_bed: "/src/models/ikea_idanas_single_bed.glb",
+        chair: "/src/models/chair.glb",
+        sofa: "/src/models/sofa.glb",
+        table: "/src/models/table.glb",
+      };
+
+      const modelPath = furnitureCategories[state.selectedFurnitureId];
       
-      const modelPath = furnitureCategories[state.selectedFurnitureId]
       if (modelPath) {
         // Define specific sizes for each furniture type
         let furnitureSize;
         let furnitureScale;
-        
-        switch(state.selectedFurnitureId) {
-          
-          case 'ikea_bed':
+
+        switch (state.selectedFurnitureId) {
+          case "ikea_bed":
             furnitureSize = { width: 1, length: 2 };
             furnitureScale = 1;
             break;
-          case 'sofa':
+          case "sofa":
             furnitureSize = { width: 1, length: 2 };
             furnitureScale = 0.025;
             break;
-          case 'chair':
+          case "table":
+            furnitureSize = { width: 1.5, length: 1.5 };
+            furnitureScale = 0.5;
+            break;
+          case "chair":
           default:
             furnitureSize = { width: 1, length: 1 };
             furnitureScale = 0.4;
             break;
         }
+
+        // Use a proper position for the preview that considers the mouse position
+        const snappedPosition = mousePosition ? { 
+          x: Math.floor(mousePosition.x), 
+          z: Math.floor(mousePosition.z) 
+        } : { x: 0, z: 0 };
         
+        // Check if position is valid (not occupied)
+        const isValid = !state.gridHelpers?.isPositionOccupied
+          ? true
+          : !state.gridHelpers.isPositionOccupied(
+              snappedPosition,
+              furnitureSize
+            );
+
         setFurniturePreview({
           modelPath,
-          position: { x: 0, z: 0 },
-          isValid: true,
+          position: snappedPosition,
+          isValid: isValid,
           size: furnitureSize,
-          scale: furnitureScale
+          scale: furnitureScale,
         });
+      } else {
+        console.error('Invalid furniture type:', state.selectedFurnitureId);
+        setFurniturePreview(null);
       }
-    } else if (!state.activeShape || state.activeShape !== 'furniture') {
-      setFurniturePreview(null)
+    } else {
+      setFurniturePreview(null);
     }
-  }, [state.activeShape, state.selectedFurnitureId])
+  }, [state.activeShape, state.selectedFurnitureId, state.gridHelpers, mousePosition]);
 
   // Calculate grid dimensions based on house dimensions
   const gridWidth = useMemo(() => {
-    if (houseDimensionsApplied) {
-      return state.houseDimensions.width
+    if (houseDimensionsApplied && state.houseDimensions?.width) {
+      return state.houseDimensions.width;
     }
-    return 20 // Default grid width
-  }, [houseDimensionsApplied, state.houseDimensions?.width])
+    return 20; // Default grid width
+  }, [houseDimensionsApplied, state.houseDimensions?.width]);
 
   const gridLength = useMemo(() => {
-    if (houseDimensionsApplied) {
-      return state.houseDimensions.length
+    if (houseDimensionsApplied && state.houseDimensions?.length) {
+      return state.houseDimensions.length;
     }
-    return 20 // Default grid length
-  }, [houseDimensionsApplied, state.houseDimensions?.length])
+    return 20; // Default grid length
+  }, [houseDimensionsApplied, state.houseDimensions?.length]);
 
   // Calculate max grid size for the gridHelper (used for divisions calculation)
   const gridSize = useMemo(() => {
-    return Math.max(gridWidth, gridLength)
-  }, [gridWidth, gridLength])
+    return Math.max(gridWidth, gridLength);
+  }, [gridWidth, gridLength]);
 
   // Calculate grid divisions based on size to maintain 1m grid cells
   const gridDivisions = useMemo(() => {
-    return Math.floor(gridSize)
-  }, [gridSize])
+    return Math.floor(gridSize);
+  }, [gridSize]);
 
   // Calculate the center position of the plane to align with the grid helpers
   const planePosition = useMemo(() => {
-    return [0, 0, 0] // The grid is already centered at origin
-  }, [])
+    return [0, 0, 0]; // The grid is already centered at origin
+  }, []);
 
   const snapToGrid = (point, isFloor = false) => {
     // Calculate grid boundaries based on center position
-    const halfWidth = gridWidth / 2
-    const halfLength = gridLength / 2
-    
+    const halfWidth = gridWidth / 2;
+    const halfLength = gridLength / 2;
+
     // For floors, snap to grid cell centers
     // For walls, snap to exact grid lines (whole numbers)
-    let gridX = isFloor 
-      ? Math.floor(point.x) + 0.5 
-      : Math.round(point.x)
-    let gridZ = isFloor 
-      ? Math.floor(point.z) + 0.5
-      : Math.round(point.z)
-    
+    let gridX = isFloor ? Math.floor(point.x) + 0.5 : Math.round(point.x);
+    let gridZ = isFloor ? Math.floor(point.z) + 0.5 : Math.round(point.z);
+
     // Ensure the point is strictly within the grid boundaries (centered at origin)
     // Clamp values to ensure they stay within grid boundaries
     if (isFloor) {
       // For floors, keep within the inner grid cells
-      gridX = Math.max(-halfWidth + 0.5, Math.min(gridX, halfWidth - 0.5))
-      gridZ = Math.max(-halfLength + 0.5, Math.min(gridZ, halfLength - 0.5))
+      gridX = Math.max(-halfWidth + 0.5, Math.min(gridX, halfWidth - 0.5));
+      gridZ = Math.max(-halfLength + 0.5, Math.min(gridZ, halfLength - 0.5));
     } else {
       // For walls, allow drawing on the grid boundaries but not outside
-      gridX = Math.max(-halfWidth, Math.min(gridX, halfWidth))
-      gridZ = Math.max(-halfLength, Math.min(gridZ, halfLength))
+      gridX = Math.max(-halfWidth, Math.min(gridX, halfWidth));
+      gridZ = Math.max(-halfLength, Math.min(gridZ, halfLength));
     }
-    
+
     // Use the clamped values directly
-    const boundedX = gridX
-    const boundedZ = gridZ
-    
+    const boundedX = gridX;
+    const boundedZ = gridZ;
+
     // Return the point snapped to grid lines or cell centers
     return {
       x: boundedX,
-      z: boundedZ
-    }
-  }
+      z: boundedZ,
+    };
+  };
 
-  const handlePointerDown = (event) => {
-    // Handle right-click for shape deselection
-    if (event.button === 2) {
-      if (typeof event.preventDefault === 'function') {
-        event.preventDefault()
-      }
-      if (typeof event.stopPropagation === 'function') {
-        event.stopPropagation()
-      }
-      dispatch({ type: 'SET_ACTIVE_SHAPE', payload: null })
-      return
-    }
-    
-    if (!state.activeShape) return
-    event.stopPropagation()
-    
-    // For shapes, snap intersection point to grid block lines
-    const snappedPoint = snapToGrid(event.point, state.activeShape === 'floor')
+  // Handle pointer move event
+  const handlePointerMove = (event) => {
+    if (!event.intersections || event.intersections.length === 0) return;
 
-    if (state.activeShape === 'furniture' && furniturePreview) {
-      const size = furniturePreview.size || { width: 1, length: 1 };
+    const intersection = event.intersections[0];
+    if (!intersection) return;
+
+    // Get the point of intersection
+    const point = intersection.point;
+    
+    // Snap to grid
+    const snappedPoint = snapToGrid(point);
+    
+    // Update mouse position for furniture preview
+    setMousePosition(snappedPoint);
+
+    // If we're drawing a wall, snap to vertical or horizontal
+    if (isDrawing && drawingPoints.length > 0 && state.activeShape === "wall") {
+      const start = drawingPoints[drawingPoints.length - 1];
+      const snappedEnd = snapToVerticalOrHorizontal(start, snappedPoint);
+      setMousePosition(snappedEnd);
+    }
+  };
+
+  // Handle pointer up event
+  const handlePointerUp = (event) => {
+    if (!isDrawing || drawingPoints.length === 0) return;
+
+    // For wall creation
+    if (state.activeShape === "wall") {
+      const start = drawingPoints[drawingPoints.length - 1];
+      const end = mousePosition;
       
-      // Check if position is valid before placing
-      const isValidPosition = checkFurnitureCollision(snappedPoint, size, previewRotation, state);
-      
-      if (isValidPosition) {
-        // Calculate the actual size based on rotation
-        const actualSize = previewRotation % Math.PI === 0 ? size : { width: size.length, length: size.width };
-        
-        // Create a list of cells to mark as occupied
-        const occupiedCells = {};
-        
-        // Mark all cells as occupied based on the furniture size
-        for (let x = 0; x < actualSize.width; x++) {
-          for (let z = 0; z < actualSize.length; z++) {
-            const cellX = Math.floor(snappedPoint.x + x);
-            const cellZ = Math.floor(snappedPoint.z + z);
-            occupiedCells[`${cellX},${cellZ}`] = true;
-          }
-        }
-        
+      // Only create wall if start and end are different points
+      if (start.x !== end.x || start.z !== end.z) {
         dispatch({
-          type: 'PLACE_FURNITURE',
+          type: "ADD_WALL",
           payload: {
-            position: snappedPoint,
-            modelPath: furniturePreview.modelPath,
-            rotation: previewRotation,
-            size: size,
-            scale: furniturePreview.scale || 1,
-            occupiedCells: occupiedCells
-          }
+            start,
+            end,
+            color: state.activeColor,
+          },
         });
-        
-        // Reset furniture preview position but keep it active for next placement
-        setFurniturePreview({
-          ...furniturePreview,
-          position: { x: 0, z: 0 },
-          isValid: true
-        });
-      } else {
-        console.log("Cannot place furniture here - position is occupied");
       }
-    } else if (state.activeShape === 'curved-wall') {
-      if (!isCurvedDrawing) {
-        setIsCurvedDrawing(true)
-        setDrawingPoints([snappedPoint])
-      } else {
-        setDrawingPoints([...drawingPoints, snappedPoint])
-      }
-    } else if (state.activeShape === 'wall') {
-      setIsDrawing(true)
-      setDrawingPoints([snappedPoint])
-    } else {
-      setIsDrawing(true)
-      setDrawingPoints([snappedPoint])
+      
+      // Reset drawing state
+      setIsDrawing(false);
+      setDrawingPoints([]);
     }
-  }
+  };
 
   const snapToVerticalOrHorizontal = (start, end) => {
     // Calculate differences in x and z coordinates
-    const dx = Math.abs(end.x - start.x)
-    const dz = Math.abs(end.z - start.z)
-    
+    const dx = Math.abs(end.x - start.x);
+    const dz = Math.abs(end.z - start.z);
+
     // Calculate grid boundaries
-    const halfWidth = gridWidth / 2
-    const halfLength = gridLength / 2
-    
+    const halfWidth = gridWidth / 2;
+    const halfLength = gridLength / 2;
+
     // Determine if the wall should be vertical or horizontal
     if (dx < dz) {
       // Vertical wall (constant x)
       // Ensure z is within grid boundaries
-      const boundedZ = Math.max(-halfLength, Math.min(end.z, halfLength))
-      return { x: start.x, z: boundedZ }
+      const boundedZ = Math.max(-halfLength, Math.min(end.z, halfLength));
+      return { x: start.x, z: boundedZ };
     } else {
       // Horizontal wall (constant z)
       // Ensure x is within grid boundaries
-      const boundedX = Math.max(-halfWidth, Math.min(end.x, halfWidth))
-      return { x: boundedX, z: start.z }
+      const boundedX = Math.max(-halfWidth, Math.min(end.x, halfWidth));
+      return { x: boundedX, z: start.z };
     }
-  }
-
-  const handlePointerMove = (event) => {
-    if (!state.activeShape) return
-    event.stopPropagation()
-    const snappedPoint = snapToGrid(event.point, state.activeShape === 'floor')
-
-    if (state.activeShape === 'furniture' && furniturePreview) {
-      // Get the furniture size
-      const size = furniturePreview.size || { width: 1, length: 1 };
-      
-      // Check if all required grid cells are available
-      const isValidPosition = checkFurnitureCollision(snappedPoint, size, previewRotation, state);
-      
-      setFurniturePreview({
-        ...furniturePreview,
-        position: snappedPoint,
-        isValid: isValidPosition
-      });
-    } else if (isDrawing && drawingPoints.length > 0) {
-      // First snap to grid, then align to vertical/horizontal
-      const gridAlignedPoint = snapToGrid(snappedPoint)
-      
-      // Ensure both the start and end points are within grid boundaries
-      const halfWidth = gridWidth / 2
-      const halfLength = gridLength / 2
-      
-      // Ensure start point is within boundaries
-      const boundedStart = {
-        x: Math.max(-halfWidth, Math.min(drawingPoints[0].x, halfWidth)),
-        z: Math.max(-halfLength, Math.min(drawingPoints[0].z, halfLength))
-      }
-      
-      // Get the aligned point (vertical or horizontal wall)
-      const alignedPoint = (state.activeShape === 'wall' || state.activeShape === 'line')
-        ? snapToVerticalOrHorizontal(boundedStart, gridAlignedPoint)
-        : gridAlignedPoint
-      setMousePosition(alignedPoint)
-
-      // If we're drawing a wall, show preview
-      if (state.activeShape === 'wall' && drawingPoints.length > 0) {
-        const previewStart = boundedStart
-        const previewEnd = alignedPoint
-        return (
-          <Wall
-            start={previewStart}
-            end={previewEnd}
-            thickness={0.2}
-            width={0.2}
-            color={state.activeColor}
-            opacity={0.5}
-          />
-        )
-      }
-    } else if (isCurvedDrawing) {
-      const gridAlignedPoint = snapToGrid(snappedPoint)
-      setMousePosition(gridAlignedPoint)
-    }
-  }
-
-  const handlePointerUp = (event) => {
-    if ((!isDrawing && !isCurvedDrawing) || !state.activeShape) return
-    event.stopPropagation()
-    const intersectionPoint = event.point
-
-    // Handle curved wall drawing differently
-    if (state.activeShape === 'curved-wall') {
-      // Don't finalize the curved wall yet, just add the point
-      return
-    }
-
-    if (state.activeShape === 'wall' || state.activeShape === 'line') {
-      // For walls, use the current mouse position (snapped to grid lines and aligned) as the endpoint
-      const snappedPoint = snapToGrid(intersectionPoint, false)
-      
-      // Ensure both the start and end points are within grid boundaries
-      const halfWidth = gridWidth / 2
-      const halfLength = gridLength / 2
-      
-      // Ensure start point is within boundaries
-      const boundedStart = {
-        x: Math.max(-halfWidth, Math.min(drawingPoints[0].x, halfWidth)),
-        z: Math.max(-halfLength, Math.min(drawingPoints[0].z, halfLength))
-      }
-      
-      // Get the aligned point (vertical or horizontal wall)
-      const alignedPoint = (state.activeShape === 'wall' || state.activeShape === 'line')
-        ? snapToVerticalOrHorizontal(boundedStart, snappedPoint)
-        : snappedPoint
-
-      dispatch({
-        type: state.activeShape === 'wall' ? 'ADD_WALL' : 'ADD_LINE',
-        payload: {
-          start: boundedStart,
-          end: alignedPoint,
-          layerId: state.activeLayer,
-          color: state.activeColor
-        }
-      })
-
-      // Reset drawing state after each wall placement
-      setIsDrawing(false)
-      setDrawingPoints([])
-    } else if (state.activeShape === 'floor') {
-      // Get the intersection point and check if it's within the grid boundaries
-      const point = event.point
-      
-      // Calculate grid boundaries based on center position
-      const halfWidth = gridWidth /2
-      const halfLength = gridLength /2
-      
-      // Check if the point is within the grid boundaries (centered at origin)
-      if (point.x >= -halfWidth && point.x <= halfWidth && 
-          point.z >= -halfLength && point.z <= halfLength) {
-        // Snap the position to the grid cell
-        const snappedPosition = snapToGrid(point, true)
-        
-        // Check if there's already a floor at this position
-        // Use a more precise comparison to avoid floating point issues
-        const floorExists = state.floors?.some(floor => {
-          const sameX = Math.abs(floor.position.x - snappedPosition.x) < 0.1;
-          const sameZ = Math.abs(floor.position.z - snappedPosition.z) < 0.1;
-          return sameX && sameZ;
-        })
-        
-        if (!floorExists) {
-          // Create a new floor tile at the snapped position
-          dispatch({
-            type: 'ADD_FLOOR',
-            payload: {
-              position: snappedPosition,
-              size: 1, // Default width of 1 unit
-              length: 1, // Default length of 1 unit
-              layerId: state.activeLayer,
-              color: state.activeColor
-            }
-          })
-        }
-      }
-    }
-
-    // Only reset drawing state if not continuing a wall
-    if (state.activeShape !== 'wall') {
-      setIsDrawing(false)
-      setDrawingPoints([])
-    }
-  }
+  };
 
   // Direct access to state elements with null checks
   const visibleWalls = state.walls || [];
   const visibleFloors = state.floors || [];
 
-  // Completely rewritten collision detection system
+  // Collision detection system for furniture placement
 
-  // 1. First, let's update the checkFurnitureCollision function
+  // Check if furniture can be placed at the given position
   const checkFurnitureCollision = (position, size, rotation, state) => {
     // Early return if state is undefined
     if (!state) return true;
 
     // Calculate the actual size based on rotation
-    const actualSize = rotation % Math.PI === 0 ? size : { width: size.length, length: size.width };
-    
+    const actualSize =
+      rotation % Math.PI === 0
+        ? size
+        : { width: size.length, length: size.width };
+
     // Use the same grid dimensions as defined in the component
     const halfWidth = gridWidth / 2;
     const halfLength = gridLength / 2;
-    
+
     // Check if furniture would be placed outside the grid
     // Allow placement at the exact grid boundaries
-    // Special handling for the north border (top of the grid)
-    if (position.x < -halfWidth || position.x + actualSize.width > halfWidth ||
-        position.z < -halfLength || position.z + actualSize.length > halfLength) {
-      // Check if position is at any grid boundary with a small tolerance for floating point precision
-      const isAtNorthBorder = Math.abs(position.z + actualSize.length ) < 0.001;
-      const isAtSouthBorder = Math.abs(position.z - (-halfLength)) < 0.001;
-      const isAtEastBorder = Math.abs(position.x + actualSize.width - halfWidth) < 0.001;
-      const isAtWestBorder = Math.abs(position.x - (-halfWidth)) < 0.001;
-      
-      // Allow placement if it's exactly at any boundary
-      if (isAtNorthBorder || isAtSouthBorder || isAtEastBorder || isAtWestBorder) {
-        // This is fine - exactly at the boundary
-      } else {
-        return false;
+    if (
+      position.x < -halfWidth ||
+      position.x + actualSize.width > halfWidth ||
+      position.z < -halfLength ||
+      position.z + actualSize.length > halfLength
+    ) {
+      return false;
+    }
+
+    // Check for collisions with walls
+    if (state.walls && state.walls.length > 0) {
+      // Implementation of wall collision detection
+      // This is a simplified version - in a real app, you'd need more complex geometry
+      for (const wall of state.walls) {
+        // Check if furniture overlaps with any wall
+        // This is a simple bounding box check
+        const wallBounds = {
+          minX: Math.min(wall.start.x, wall.end.x) - 0.1,
+          maxX: Math.max(wall.start.x, wall.end.x) + 0.1,
+          minZ: Math.min(wall.start.z, wall.end.z) - 0.1,
+          maxZ: Math.max(wall.start.z, wall.end.z) + 0.1,
+        };
+
+        const furnitureBounds = {
+          minX: position.x,
+          maxX: position.x + actualSize.width,
+          minZ: position.z,
+          maxZ: position.z + actualSize.length,
+        };
+
+        if (
+          furnitureBounds.minX <= wallBounds.maxX &&
+          furnitureBounds.maxX >= wallBounds.minX &&
+          furnitureBounds.minZ <= wallBounds.maxZ &&
+          furnitureBounds.maxZ >= wallBounds.minZ
+        ) {
+          return false;
+        }
       }
     }
-    
-
 
     // Check all grid cells that would be occupied by this furniture
     for (let x = 0; x < actualSize.width; x++) {
@@ -524,31 +489,96 @@ export default function Scene() {
         const cellX = Math.floor(position.x + x);
         const cellZ = Math.floor(position.z + z);
         const key = `${cellX},${cellZ}`;
-        
+
         // Check if cell is already occupied by other furniture
         if (state.occupiedGridCells && state.occupiedGridCells[key]) {
           return false;
         }
       }
     }
-    
+
     return true;
   };
 
-  
-
   // Helper function to calculate distance from a point to a line segment
-
 
   return (
     <>
       <group ref={setNodeRef}>
         <ambientLight intensity={0.5} />
-        <directionalLight position={[5, 5, 5]} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+        <directionalLight
+          position={[5, 5, 5]}
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
 
         {/* Grid and existing elements */}
         <gridHelper args={[gridSize, gridDivisions]} />
-        <mesh ref={planeRef} rotation={[-Math.PI / 2, 0, 0]} position={planePosition} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onContextMenu={(e) => { if (e && typeof e.preventDefault === 'function') e.preventDefault(); }}>
+        <mesh
+          ref={planeRef}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={planePosition}
+          onPointerDown={(event) => {
+            if (!event.intersections || event.intersections.length === 0) return;
+
+            const intersection = event.intersections[0];
+            if (!intersection) return;
+
+            // Get the point of intersection
+            const point = intersection.point;
+            // Snap to grid
+            const snappedPoint = snapToGrid(point);
+
+            // Handle different active shapes
+            if (state.activeShape === "wall") {
+              setIsDrawing(true);
+              setDrawingPoints([...drawingPoints, snappedPoint]);
+            } else if (state.activeShape === "floor") {
+              // Create a floor at the clicked position
+              const floorSize = 1; // Default size
+              dispatch({
+                type: "ADD_FLOOR",
+                payload: {
+                  position: snappedPoint,
+                  size: floorSize,
+                  color: state.activeColor,
+                },
+              });
+            } else if (state.activeShape === "furniture" && furniturePreview) {
+              // Add furniture at the position of the preview
+              if (furniturePreview.isValid) {
+                const furnitureId = `furniture-${Date.now()}`;
+                dispatch({
+                  type: "ADD_OBJECT",
+                  payload: {
+                    id: furnitureId,
+                    type: "furniture",
+                    modelPath: furniturePreview.modelPath,
+                    position: furniturePreview.position,
+                    rotation: previewRotation,
+                    scale: furniturePreview.scale,
+                    size: furniturePreview.size,
+                  },
+                });
+
+                // Mark grid cells as occupied
+                if (state.gridHelpers && state.gridHelpers.occupyGridCells) {
+                  state.gridHelpers.occupyGridCells(
+                    furniturePreview.position,
+                    furniturePreview.size,
+                    furnitureId
+                  );
+                }
+              }
+            }
+          }}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onContextMenu={(e) => {
+            if (e && typeof e.preventDefault === "function") e.preventDefault();
+          }}
+        >
           <planeGeometry args={[gridWidth, gridLength]} />
           <meshStandardMaterial visible={false} />
         </mesh>
@@ -559,18 +589,21 @@ export default function Scene() {
         ))}
 
         {/* Render wall preview while drawing */}
-        {isDrawing && state.activeShape === 'wall' && drawingPoints.length > 0 && mousePosition && (
-          <Wall
-            start={drawingPoints[drawingPoints.length - 1]}
-            end={mousePosition}
-            height={3}
-            width={0.2}
-            color={state.activeColor}
-            opacity={0.5}
-            castShadow
-            receiveShadow
-          />
-        )}
+        {isDrawing &&
+          state.activeShape === "wall" &&
+          drawingPoints.length > 0 &&
+          mousePosition && (
+            <Wall
+              start={drawingPoints[drawingPoints.length - 1]}
+              end={mousePosition}
+              height={3}
+              width={0.2}
+              color={state.activeColor}
+              opacity={0.5}
+              castShadow
+              receiveShadow
+            />
+          )}
 
         {visibleFloors.map((floor, index) => (
           <Floor key={index} {...floor} />
@@ -578,33 +611,36 @@ export default function Scene() {
 
         {/* Render placed furniture and imported 3D models */}
         {state.objects.map((object, index) => {
-         
-          
-          
           // Handle regular furniture models
           if (object.modelPath) {
             // Determine furniture type from model path
-            const furnitureType = object.modelPath.includes('chair') ? 'chair' : 
-                                  object.modelPath.includes('sofa') ? 'sofa' : 
-                                  object.modelPath.includes('ikea_bed') ? 'ikea_bed' : 'bed';
-            
+            const furnitureType = object.modelPath.includes("chair")
+              ? "chair"
+              : object.modelPath.includes("sofa")
+              ? "sofa"
+              : object.modelPath.includes("ikea_bed")
+              ? "ikea_bed"
+              : object.modelPath.includes("table")
+              ? "table"
+              : "bed";
+
             // Create a new position object with proper coordinates
-            const adjustedPosition = { 
-              x: object.position.x, 
-              y: 0, 
-              z: object.position.z 
+            const adjustedPosition = {
+              x: object.position.x,
+              y: 0,
+              z: object.position.z,
             };
-            
+
             // Apply specific position adjustments for each furniture type
-            if (furnitureType === 'sofa') {
+            if (furnitureType === "sofa") {
               // Center the sofa horizontally in its grid cells
               adjustedPosition.x = object.position.x + 0.5;
-            } else if (furnitureType === 'chair') {
+            } else if (furnitureType === "chair") {
               // Center the chair in its grid cell
               adjustedPosition.x = object.position.x + 0.5;
               adjustedPosition.z = object.position.z + 0.1;
             }
-            
+
             return (
               <FurnitureModel
                 key={object.id || index}
@@ -615,11 +651,11 @@ export default function Scene() {
               />
             );
           }
-          
+
           // Return null for objects that don't match any rendering criteria
           return null;
         })}
-        
+
         {/* Render furniture preview */}
         {furniturePreview && (
           <FurniturePreview
@@ -631,7 +667,7 @@ export default function Scene() {
           />
         )}
       </group>
-      <OrbitControls enableDamping={false} enabled={state.isRotationEnabled} />
+      {state.isRotationEnabled && <OrbitControls enableDamping={false} />}
     </>
-  )
+  );
 }

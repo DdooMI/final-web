@@ -21,8 +21,10 @@ import MessageDetailPage from "./Pages/MessageDetailPage";
 import ClientRequestPage from "./Desgin pages/ClientRequestPage";
 import ClientRequestsPage from "./Desgin pages/ClientRequestsPage";
 import ClientDesignersPage from "./Desgin pages/ClientDesignersPage";
+
 import DesignerRequestsPage from "./Desgin pages/DesignerRequestsPage";
 import DesignerProposalsPage from "./Desgin pages/DesignerProposalsPage";
+
 import DesignerPortfolioPage from "./Desgin pages/DesignerPortfolioPage";
 import PaymentPage from "./Pages/PaymentPage";
 
@@ -64,8 +66,10 @@ function App() {
         <Route path="/client-request" element={<ClientRequestPage />} />
         <Route path="/client-requests" element={<ClientRequestsPage />} />
         <Route path="/client-designers" element={<ClientDesignersPage />} />
+ 
         <Route path="/designer-requests" element={<DesignerRequestsPage />} />
         <Route path="/designer-proposals" element={<DesignerProposalsPage />} />
+   
         <Route
           path="/designer-portfolio/:designerId"
           element={<DesignerPortfolioPage />}

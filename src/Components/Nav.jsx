@@ -8,10 +8,9 @@ import { subscribeToUnreadMessageCount } from "../firebase/messages";
 // Constants for dropdown states
 const INITIAL_DROPDOWN_STATE = {
   menu: false,
-  notifications: false
+  notifications: false,
+  profile: false
 };
-
-
 
 function Nav() {
   const { user, profile, logout, role } = useAuth();
@@ -19,9 +18,11 @@ function Nav() {
 
   const notificationsRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  const profileDropdownRef = useRef(null);
   const [dropdownState, setDropdownState] = useState(INITIAL_DROPDOWN_STATE);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -37,7 +38,6 @@ function Nav() {
       setUnreadNotifications(snapshot.docs.length);
     });
 
-    // Subscribe to unread message count
     const unsubscribeMessages = subscribeToUnreadMessageCount(user.uid, (count) => {
       setUnreadMessages(count);
     });
@@ -53,62 +53,76 @@ function Nav() {
   }, []);
 
   const toggleDropdown = useCallback((dropdownName) => {
-    setDropdownState(prev => ({
+    setDropdownState((prev) => ({
       ...INITIAL_DROPDOWN_STATE,
-      [dropdownName]: !prev[dropdownName]
+      [dropdownName]: !prev[dropdownName],
     }));
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
 
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-  // Close dropdowns and mobile menu when clicking outside or pressing escape
   useEffect(() => {
     const handleClickOutside = (event) => {
       const refs = {
         notifications: notificationsRef,
-        menu: mobileMenuRef
+        menu: mobileMenuRef,
+        profile: profileDropdownRef,
       };
 
       Object.entries(refs).forEach(([key, ref]) => {
         if (ref.current && !ref.current.contains(event.target)) {
-          setDropdownState(prev => ({ ...prev, [key]: false }));
+          setDropdownState((prev) => ({ ...prev, [key]: false }));
         }
       });
     };
 
     const handleEscape = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         closeAllDropdowns();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [closeAllDropdowns]);
+
   return (
     <header>
-      <nav className="fixed top-0 left-0 w-full bg-white backdrop-blur-lg shadow-md z-50">
-        <div className="container mx-auto xl:px-6 px-6  py-4 flex justify-between items-center">
+      <nav
+        className={`fixed top-0 left-0 w-full bg-white/95 backdrop-blur-lg z-50 transition-all duration-300 ${
+          isScrolled ? "shadow-lg py-2" : "py-4"
+        }`}
+      >
+        <div className="container mx-auto  flex justify-between items-center">
           {/* Logo */}
-          <div className="text-3xl font-semibold font-playfair tracking-tighter logo mr-8">
-            Harmony<span className="text-[#C19A6B] font-normal">Interiors</span>
+          <div className="text-3xl font-semibold font-playfair tracking-tighter logo mr-8 group">
+            <NavLink to="/" className="flex items-center">
+              <span className="transition-all duration-300 group-hover:text-gray-800">Harmony</span>
+              <span className="text-[#C19A6B] font-normal transition-all duration-300 group-hover:text-[#A0784A]">Interiors</span>
+            </NavLink>
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden xl:flex items-center gap-x-4">
-
-            <ul className="flex gap-x-3 text-[16px] font-medium tracking-tight">
+          <div className="hidden xl:flex items-center gap-x-6">
+            <ul className="flex gap-x-4 text-[16px] font-medium tracking-tight">
               <li>
                 <NavLink
                   to="/"
                   className={({ isActive }) =>
                     isActive
-                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                       : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                   }
                 >
@@ -120,19 +134,19 @@ function Nav() {
                   to="/about"
                   className={({ isActive }) =>
                     isActive
-                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                       : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                   }
                 >
                   About
                 </NavLink>
               </li>
-              <li >
+              <li>
                 <NavLink
                   to="/services"
                   className={({ isActive }) =>
                     isActive
-                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                       : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                   }
                 >
@@ -146,7 +160,7 @@ function Nav() {
                       to="/designer-requests"
                       className={({ isActive }) =>
                         isActive
-                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                           : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                       }
                     >
@@ -158,7 +172,7 @@ function Nav() {
                       to="/designer-proposals"
                       className={({ isActive }) =>
                         isActive
-                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                           : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                       }
                     >
@@ -174,7 +188,7 @@ function Nav() {
                       to="/client-requests"
                       className={({ isActive }) =>
                         isActive
-                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                           : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                       }
                     >
@@ -187,7 +201,7 @@ function Nav() {
                       to="/client-designers"
                       className={({ isActive }) =>
                         isActive
-                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                          ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                           : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                       }
                     >
@@ -201,7 +215,7 @@ function Nav() {
                   to="/contact"
                   className={({ isActive }) =>
                     isActive
-                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B]"
+                      ? "text-[#C19A6B] relative py-2.5 px-4 after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-[#C19A6B] font-medium"
                       : "relative py-2.5 px-4 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[2px] after:bg-[#C19A6B] hover:after:w-full after:transition-all after:duration-300"
                   }
                 >
@@ -211,46 +225,149 @@ function Nav() {
             </ul>
             {user && (
               <div className="flex items-center gap-x-4">
-                <NavLink to="/notifications" className="relative p-2 text-gray-700 hover:text-[#C19A6B] transition-all duration-300">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                <NavLink to="/notifications" className="relative p-2 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 hover:scale-110">
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                    />
                   </svg>
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#C19A6B] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    <span
+                      className="absolute -top-1 -right-1 bg-[#C19A6B] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full animate-pulse"
+                    >
                       {unreadNotifications}
                     </span>
                   )}
                 </NavLink>
-                <NavLink to="/messages" className="relative p-2 text-gray-700 hover:text-[#C19A6B] transition-all duration-300">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <NavLink to="/messages" className="relative p-2 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 hover:scale-110">
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
                   </svg>
                   {unreadMessages > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#C19A6B] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    <span
+                      className="absolute -top-1 -right-1 bg-[#C19A6B] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full animate-pulse"
+                    >
                       {unreadMessages}
                     </span>
                   )}
                 </NavLink>
-                <NavLink to="/profile" className="flex items-center space-x-2 border-3 rounded-full border border-[#C19A6B]/20 hover:border-[#C19A6B] transition-all duration-300 shadow-sm">
-                  <div className="w-10 h-10 rounded-full overflow-hidden">
-                    <img src={profile?.photoURL || '/person.gif'} alt="Profile" className="w-full h-full object-cover" />
-                  </div>
-                </NavLink>
+                <div
+                  className="relative ml-2"
+                  ref={profileDropdownRef}
+                >
+                  <button
+                    onClick={() => toggleDropdown("profile")}
+                    className="flex items-center space-x-2 focus:outline-none group"
+                  >
+                    <div
+                      className="w-9 h-9 rounded-full bg-[#C19A6B]/20 flex items-center justify-center text-[#C19A6B] font-medium transition-all duration-300 group-hover:bg-[#C19A6B]/30 group-hover:shadow-md"
+                    >
+                      {profile?.displayName
+                        ? profile.displayName.charAt(0).toUpperCase()
+                        : user.email.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-gray-700 hidden md:inline-block group-hover:text-[#C19A6B] transition-all duration-300">
+                      {profile?.displayName || user.email.split("@")[0]}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-300 ${
+                        dropdownState.profile ? "rotate-180 text-[#C19A6B]" : ""
+                      } group-hover:text-[#C19A6B]`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {dropdownState.profile && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5 animate-fadeIn">
+                      <NavLink
+                        to="/profile"
+                        className="block px-4 py-2 text-gray-700 hover:bg-[#C19A6B]/10 hover:text-[#C19A6B]"
+                        onClick={closeAllDropdowns}
+                      >
+                        Profile
+                      </NavLink>
+                      {role === "client" && (
+                        <NavLink
+                          to="/client-requests"
+                          className="block px-4 py-2 text-gray-700 hover:bg-[#C19A6B]/10 hover:text-[#C19A6B]"
+                          onClick={closeAllDropdowns}
+                        >
+                          My Requests
+                        </NavLink>
+                      )}
+                      {role === "designer" && (
+                        <NavLink
+                          to="/designer-proposals"
+                          className="block px-4 py-2 text-gray-700 hover:bg-[#C19A6B]/10 hover:text-[#C19A6B]"
+                          onClick={closeAllDropdowns}
+                        >
+                          My Proposals
+                        </NavLink>
+                      )}
+                      <button
+                        onClick={() => {
+                          logout(navigate);
+                          closeAllDropdowns();
+                        }}
+                        className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {!user && (
               <div className="flex gap-x-4">
                 <NavLink
                   to="/login"
-                  className="px-6 py-2 text-[#C19A6B] border border-[#C19A6B] rounded-lg hover:bg-[#C19A6B] hover:text-white transition-all duration-300"
+                  className="px-6 py-2.5 text-[#C19A6B] border border-[#C19A6B] rounded-lg hover:bg-[#C19A6B] hover:text-white transition-all duration-300 shadow-sm hover:shadow-md font-medium"
                 >
-                  Login
+                  <span className="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Login
+                  </span>
                 </NavLink>
                 <NavLink
                   to="/signup"
-                  className="px-6 py-2 text-white bg-[#C19A6B] border border-[#C19A6B] rounded-lg hover:bg-white/0 hover:text-[#C19A6B] transition-all duration-300"
+                  className="px-6 py-2.5 text-white bg-[#C19A6B] border border-[#C19A6B] rounded-lg hover:bg-[#A0784A] hover:border-[#A0784A] transition-all duration-300 shadow-sm hover:shadow-md font-medium"
                 >
-                  Sign up
+                  <span className="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Sign up
+                  </span>
                 </NavLink>
               </div>
             )}
@@ -258,49 +375,97 @@ function Nav() {
 
           {/* Mobile Menu Toggle */}
           <button
-            className="xl:hidden p-2 text-gray-700  hover:text-[#C19A6B] transition-all"
-            onClick={() => toggleDropdown('menu')}
+            className="xl:hidden p-2 text-gray-700 hover:text-[#C19A6B] transition-all duration-300 focus:outline-none"
+            onClick={() => toggleDropdown("menu")}
           >
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              className={`w-10 h-10 transition-transform duration-300 ${dropdownState.menu ? "rotate-90" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={dropdownState.menu 
+                  ? "M6 18L18 6M6 6l12 12" 
+                  : "M4 6h16M4 12h16M4 18h16"}
+              />
             </svg>
           </button>
 
           {/* Mobile Menu */}
           <div
             ref={mobileMenuRef}
-            className={`xl:hidden fixed inset-0 bg-black/40 backdrop-blur-sm transform ${dropdownState.menu ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out z-50`}
+            className={`xl:hidden fixed inset-0 bg-black/60 backdrop-blur-sm transform ${
+              dropdownState.menu ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"
+            } transition-all duration-500 ease-in-out z-50`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                closeAllDropdowns();
+              }
+            }}
           >
-            <div className="absolute right-0 top-0 h-screen w-72 bg-white shadow-2xl transform transition-transform duration-300">
+            <div
+              className={`absolute right-0 top-0 h-screen w-80 bg-white shadow-2xl transform transition-all duration-500 ease-in-out ${
+                dropdownState.menu ? "translate-x-0" : "translate-x-full"
+              }`}
+            >
               <div className="p-6 flex flex-col h-full">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-8">
                   {user && (
                     <div
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-all duration-300"
-                      onClick={() => navigate('/profile')}
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-all duration-300 shadow-sm hover:shadow-md"
+                      onClick={() => {
+                        navigate("/profile");
+                        closeAllDropdowns();
+                      }}
                     >
-                      <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#C19A6B]/20 hover:border-[#C19A6B] transition-all duration-300 shadow-sm">
-                        <img
-                          src={profile?.photoURL || '/person.gif'}
-                          alt="Profile"
-                          className="w-full h-full object-cover"
-                        />
+                      <div
+                        className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#C19A6B]/20 hover:border-[#C19A6B] transition-all duration-300 shadow-sm"
+                      >
+                        {profile?.photoURL ? (
+                          <img
+                            src={profile.photoURL}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-[#C19A6B]/20 flex items-center justify-center text-[#C19A6B] font-medium">
+                            {profile?.displayName
+                              ? profile.displayName.charAt(0).toUpperCase()
+                              : user.email.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {profile?.name || 'User'}
+                          {profile?.name || "User"}
                         </p>
-                        <p className="text-xs text-gray-500 truncate capitalize">{role}</p>
+                        <p className="text-xs text-gray-500 truncate capitalize">
+                          {role}
+                        </p>
                       </div>
                     </div>
                   )}
                   <button
-                    className="p-2 text-gray-500 hover:text-[#C19A6B] transition-all duration-300"
+                    className="p-2 text-gray-500 hover:text-[#C19A6B] transition-all duration-300 hover:rotate-90"
                     onClick={() => closeAllDropdowns()}
                     aria-label="Close menu"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -310,12 +475,26 @@ function Nav() {
                     <NavLink
                       to="/"
                       className={({ isActive }) =>
-                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                          isActive
+                            ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                            : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                        } transition-all duration-300 hover:translate-x-1`
                       }
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                        />
                       </svg>
                       <span>Home</span>
                     </NavLink>
@@ -324,12 +503,26 @@ function Nav() {
                     <NavLink
                       to="/about"
                       className={({ isActive }) =>
-                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                          isActive
+                            ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                            : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                        } transition-all duration-300 hover:translate-x-1`
                       }
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                       <span>About</span>
                     </NavLink>
@@ -338,31 +531,62 @@ function Nav() {
                     <NavLink
                       to="/services"
                       className={({ isActive }) =>
-                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                          isActive
+                            ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                            : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                        } transition-all duration-300 hover:translate-x-1`
                       }
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
                       </svg>
                       <span>Services</span>
                     </NavLink>
-                  </li>{user && (
+                  </li>
+                  {user && (
                     <>
                       <li>
                         <NavLink
                           to="/notifications"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                            />
                           </svg>
                           <span>Notifications</span>
                           {unreadNotifications > 0 && (
-                            <span className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                            <span
+                              className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full"
+                            >
                               {unreadNotifications}
                             </span>
                           )}
@@ -372,16 +596,32 @@ function Nav() {
                         <NavLink
                           to="/messages"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                            />
                           </svg>
                           <span>Messages</span>
                           {unreadMessages > 0 && (
-                            <span className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                            <span
+                              className="bg-[#C19A6B] text-white text-xs font-medium px-2 py-0.5 rounded-full"
+                            >
                               {unreadMessages}
                             </span>
                           )}
@@ -389,18 +629,32 @@ function Nav() {
                       </li>
                     </>
                   )}
-                  {role === 'designer' && (
+                  {role === "designer" && (
                     <>
                       <li>
                         <NavLink
                           to="/designer-requests"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                            />
                           </svg>
                           <span>Requests</span>
                         </NavLink>
@@ -409,29 +663,58 @@ function Nav() {
                         <NavLink
                           to="/designer-proposals"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           <span>Proposals</span>
                         </NavLink>
                       </li>
                     </>
-                  )}{role === 'client' && (
+                  )}
+                  {role === "client" && (
                     <>
                       <li>
                         <NavLink
                           to="/client-requests"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                            />
                           </svg>
                           <span>My Requests</span>
                         </NavLink>
@@ -440,12 +723,26 @@ function Nav() {
                         <NavLink
                           to="/client-designers"
                           className={({ isActive }) =>
-                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                            `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                              isActive
+                                ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                                : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                            } transition-all duration-300 hover:translate-x-1`
                           }
                           onClick={closeAllDropdowns}
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           <span>Designers</span>
                         </NavLink>
@@ -456,12 +753,26 @@ function Nav() {
                     <NavLink
                       to="/contact"
                       className={({ isActive }) =>
-                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${isActive ? 'text-[#C19A6B] bg-[#C19A6B]/10 font-medium' : 'text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5'} transition-all duration-300`
+                        `flex items-center space-x-2 px-4 py-3 rounded-lg ${
+                          isActive
+                            ? "text-[#C19A6B] bg-[#C19A6B]/10 font-medium shadow-sm"
+                            : "text-gray-700 hover:text-[#C19A6B] hover:bg-[#C19A6B]/5"
+                        } transition-all duration-300 hover:translate-x-1`
                       }
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
                       </svg>
                       <span>Contact</span>
                     </NavLink>
@@ -477,8 +788,18 @@ function Nav() {
                       }}
                       className="flex items-center space-x-2 w-full px-4 py-3 text-left text-gray-700 hover:text-white hover:bg-[#FF0000]/80 rounded-lg transition-all duration-300"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                        />
                       </svg>
                       <span>Logout</span>
                     </button>
@@ -490,8 +811,18 @@ function Nav() {
                       className="flex items-center justify-center space-x-2 w-full px-4 py-2.5 text-[#C19A6B] border border-[#C19A6B] rounded-lg hover:bg-[#C19A6B] hover:text-white transition-all duration-300"
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                        />
                       </svg>
                       <span>Login</span>
                     </NavLink>
@@ -500,8 +831,18 @@ function Nav() {
                       className="flex items-center justify-center space-x-2 w-full px-4 py-2.5 text-white  border border-[#C19A6B] bg-[#C19A6B] rounded-lg hover:bg-white hover:text-[#C19A6B] transition-all duration-300"
                       onClick={closeAllDropdowns}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                        />
                       </svg>
                       <span>Sign up</span>
                     </NavLink>
@@ -517,4 +858,3 @@ function Nav() {
 }
 
 export default Nav;
-
