@@ -61,10 +61,20 @@ function DesignerRequestsPage() {
           requestsData.push({
             id: doc.id,
             ...doc.data(),
+            createdAtTimestamp: doc.data().createdAt ? doc.data().createdAt.toDate() : null,
             createdAt: doc.data().createdAt
               ? formatDistanceToNow(doc.data().createdAt.toDate(), { addSuffix: true })
               : "Unknown date",
           });
+        });
+
+        // Sort requests from newest to oldest
+        requestsData.sort((a, b) => {
+          // Handle cases where createdAt might be null
+          if (!a.createdAtTimestamp) return 1;
+          if (!b.createdAtTimestamp) return -1;
+          // Sort in descending order (newest first)
+          return b.createdAtTimestamp - a.createdAtTimestamp;
         });
 
         setRequests(requestsData);

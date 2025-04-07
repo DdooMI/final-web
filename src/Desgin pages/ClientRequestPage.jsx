@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
+import { useBalance } from "../zustand/balance";
 import { Navigate, useNavigate } from "react-router-dom";
 import { doc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
@@ -19,10 +20,19 @@ const requestSchema = z.object({
 
 function ClientRequestPage() {
   const { user, role } = useAuth();
+  const { balance, fetchBalance, isLoading: balanceLoading } = useBalance();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [insufficientBalance, setInsufficientBalance] = useState(false);
+  
+  // Fetch user balance when component mounts
+  useEffect(() => {
+    if (user) {
+      fetchBalance(user.uid);
+    }
+  }, [user, fetchBalance]);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     resolver: zodResolver(requestSchema),
@@ -39,6 +49,15 @@ function ClientRequestPage() {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setError(null);
+    setInsufficientBalance(false);
+    
+    // Check if budget exceeds available balance
+    const budgetAmount = Number(data.budget);
+    if (budgetAmount > balance) {
+      setInsufficientBalance(true);
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Add the request to Firestore
@@ -112,6 +131,22 @@ function ClientRequestPage() {
         )}
 
         <div className="bg-white shadow-lg rounded-xl p-8">
+          {/* Display user balance */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-700 font-medium">Your Available Balance:</span>
+              <span className="text-xl font-bold text-[#C19A6B]">${balance.toFixed(2)} USD</span>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">Your budget must not exceed your available balance.</p>
+          </div>
+          
+          {insufficientBalance && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative" role="alert">
+              <strong className="font-bold">Insufficient balance!</strong>
+              <span className="block sm:inline"> Your budget exceeds your available balance. Please reduce your budget or add funds to your account.</span>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <label

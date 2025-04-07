@@ -2,6 +2,8 @@ import { useScene } from '../context/SceneContext';
 import { useState, useEffect, useRef } from 'react';
 import useStore from '../store';
 import * as THREE from 'three';
+import { saveDesignAsHtml } from '../utils/saveDesignAsHtml';
+import { toast } from 'react-hot-toast';
 
 const shapes = [
   { id: 'wall', name: 'Wall', icon: '▭' },
@@ -222,14 +224,46 @@ export default function RightSidebar() {
       }}>
       <div className="flex flex-col mb-1">
         <h2 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#C19A6B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
           {(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? '' : 'Design Tools'}
         </h2>
         <div ref={toolbarContainerRef} className={`flex ${(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? 'flex-col items-center' : 'overflow-x-auto scrollbar-thin scrollbar-track-gray-100 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-500'} gap-3 mt-3 pb-1`}>
           <button
-            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${isRotationEnabled ? 'bg-blue-600 text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
+            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 bg-green-600 text-white hover:bg-green-700 border border-green-500`}
+            onClick={() => {
+              try {
+                // Get the current scene data from state
+                const sceneData = {
+                  objects: state.objects,
+                  walls: state.walls,
+                  floors: state.floors,
+                  houseDimensions: state.houseDimensions,
+                  metadata: {
+                    exportDate: new Date().toISOString(),
+                    version: "1.0",
+                    projectName: `interior-design-${Date.now()}`
+                  }
+                };
+                
+                // Save the design as HTML
+                saveDesignAsHtml(sceneData, `interior-design-${Date.now()}`);
+                toast.success("3D design saved as HTML successfully!");
+              } catch (error) {
+                console.error("Error saving design as HTML:", error);
+                toast.error("Failed to save design: " + (error.message || "Unknown error"));
+              }
+            }}
+            title="Save Design as HTML"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? '' : 'Save Design'}
+          </button>
+          <button
+            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${isRotationEnabled ? 'bg-[#C19A6B] text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
             onClick={handleRotationToggle}
             title={isRotationEnabled ? 'Stop Rotation' : 'Start Rotation'}
           >
@@ -246,7 +280,7 @@ export default function RightSidebar() {
           </button>
           <button
             ref={dimensionsButtonRef}
-            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showDimensionsPanel ? 'bg-blue-600 text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
+            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showDimensionsPanel ? 'bg-[#C19A6B] text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
             onClick={() => togglePanel('dimensions')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -256,7 +290,7 @@ export default function RightSidebar() {
           </button>
           <button
             ref={colorButtonRef}
-            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showColorPicker ? 'bg-blue-600 text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
+            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showColorPicker ? 'bg-[#C19A6B] text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
             onClick={() => togglePanel('color')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -266,7 +300,7 @@ export default function RightSidebar() {
           </button>
           <button
             ref={shapesButtonRef}
-            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showShapesPanel ? 'bg-blue-600 text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
+            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${showShapesPanel ? 'bg-[#C19A6B] text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
             onClick={() => togglePanel('shapes')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -281,7 +315,7 @@ export default function RightSidebar() {
         <div className="mb-6 p-5 bg-white rounded-xl shadow-md border border-gray-200 transition-all duration-300 hover:shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#C19A6B]" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5.5 2a3.5 3.5 0 101.665 6.58L8.585 10l-1.42 1.42a3.5 3.5 0 101.414 1.414L10 11.414l1.42 1.42a3.5 3.5 0 101.414-1.414L11.414 10l1.42-1.42A3.5 3.5 0 1011.5 2 3.5 3.5 0 008 5.5a3.5 3.5 0 00.58 1.915L7.165 8.83A3.5 3.5 0 005.5 2zM13.5 5.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-8 8a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm11-1.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" clipRule="evenodd" />
               </svg>
               House Dimensions
@@ -308,7 +342,7 @@ export default function RightSidebar() {
                   min="0"
                   step="0.5"
                   placeholder="Enter width"
-                  className={`w-full p-2.5 pl-3 pr-12 border ${validateDimensions().width ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
+                  className={`w-full p-2.5 pl-3 pr-12 border ${validateDimensions().width ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-[#C19A6B] focus:border-transparent transition-all duration-200`}
                 />
                 <div className="absolute right-0 top-0 bottom-0 flex items-center px-3 pointer-events-none bg-gray-100 rounded-r-md border-l border-gray-300">
                   <span className="text-gray-500 text-sm font-medium">m</span>
@@ -333,7 +367,7 @@ export default function RightSidebar() {
                   min="0"
                   step="0.5"
                   placeholder="Enter length"
-                  className={`w-full p-2.5 pl-3 pr-12 border ${validateDimensions().length ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200`}
+                  className={`w-full p-2.5 pl-3 pr-12 border ${validateDimensions().length ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-[#C19A6B] focus:border-transparent transition-all duration-200`}
                 />
                 <div className="absolute right-0 top-0 bottom-0 flex items-center px-3 pointer-events-none bg-gray-100 rounded-r-md border-l border-gray-300">
                   <span className="text-gray-500 text-sm font-medium">m</span>
@@ -344,7 +378,7 @@ export default function RightSidebar() {
             <button
               onClick={applyHouseDimensions}
               disabled={Object.keys(validateDimensions()).length > 0}
-              className={`w-full mt-3 px-4 py-2.5 rounded-md font-medium transition-all duration-200 ${Object.keys(validateDimensions()).length > 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+              className={`w-full mt-3 px-4 py-2.5 rounded-md font-medium transition-all duration-200 ${Object.keys(validateDimensions()).length > 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#C19A6B] text-white hover:bg-gray-500 shadow-md hover:shadow-lg'}`}
             >
               {state.houseDimensions?.isApplied ? 'Update Dimensions' : 'Apply Dimensions'}
             </button>
@@ -390,7 +424,7 @@ export default function RightSidebar() {
                 <span>Current: {state.activeColor}</span>
                 <button
                   onClick={() => handleColorChange('#808080')}
-                  className="text-blue-600 hover:text-blue-800 transition-colors font-medium"
+                  className="text-[#C19A6B] hover:text-gray-500 transition-colors font-medium"
                 >
                   Reset
                 </button>
@@ -411,7 +445,7 @@ export default function RightSidebar() {
                 <button
                   key={shape.id}
                   className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 
-                    ${state.activeShape === shape.id ? 'bg-blue-100 text-blue-700 shadow-sm border-l-4 border-blue-500' : 'bg-white hover:bg-gray-50 border border-gray-200'}`}
+                    ${state.activeShape === shape.id ? 'bg-[#f5efe6] text-[#A0784A] shadow-sm border-l-4 border-[#C19A6B]' : 'bg-white hover:bg-gray-50 border border-gray-200'}`}
                   onClick={() => handleShapeClick(shape.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -420,11 +454,11 @@ export default function RightSidebar() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-5 h-5 rounded-full border ${state.activeShape === shape.id ? 'border-blue-500' : 'border-gray-300'}`}
+                      className={`w-5 h-5 rounded-full border ${state.activeShape === shape.id ? 'border-[#C19A6B]' : 'border-gray-300'}`}
                       style={{ backgroundColor: state.activeColor }}
                     />
                     {state.activeShape === shape.id && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#C19A6B]" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}

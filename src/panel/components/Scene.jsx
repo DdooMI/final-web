@@ -148,7 +148,7 @@ export default function Scene() {
     const initializeScene = () => {
       try {
         // Initialize Three.js scene
-        if (!window.THREE) {
+        if (!THREE) {
           throw new Error("Three.js not loaded");
         }
 
@@ -219,10 +219,10 @@ export default function Scene() {
   useEffect(() => {
     if (state.activeShape === "furniture" && state.selectedFurnitureId) {
       const furnitureCategories = {
-        ikea_bed: "/src/models/ikea_idanas_single_bed.glb",
-        chair: "/src/models/chair.glb",
-        sofa: "/src/models/sofa.glb",
-        table: "/src/models/table.glb",
+        ikea_bed: "src/models/ikea_idanas_single_bed.glb",
+        chair: "src/models/chair.glb",
+        sofa: "src/models/sofa.glb",
+        table: "src/models/table.glb",
       };
 
       const modelPath = furnitureCategories[state.selectedFurnitureId];

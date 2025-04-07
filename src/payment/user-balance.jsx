@@ -2,12 +2,12 @@
 
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Wallet } from "lucide-react"
 import { useAuth } from "../zustand/auth"
 import { useBalance } from "../zustand/balance"
 
 const UserBalance = () => {
-  const { user, role } = useAuth()
+  const { user } = useAuth()
   const { balance, fetchBalance, isLoading } = useBalance()
   const navigate = useNavigate()
 
@@ -40,34 +40,13 @@ const UserBalance = () => {
       </div>
 
       <div className="border-t border-gray-200 pt-4 mt-2">
-        {role === "client" ? (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleNavigateToPayment}
-              className="flex items-center justify-center px-4 py-2 bg-[#A67B5B] text-white rounded-md hover:bg-[#8D6E63] transition-colors"
-            >
-              <ArrowUpRight className="h-4 w-4 mr-2" />
-              Deposit Funds
-            </button>
-            <button 
-              onClick={handleNavigateToPayment}
-              className="flex items-center justify-center px-4 py-2 border border-[#A67B5B] text-[#A67B5B] rounded-md hover:bg-[#F5EFE7] transition-colors"
-            >
-              <ArrowDownRight className="h-4 w-4 mr-2" />
-              Withdraw Funds
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button 
-              onClick={handleNavigateToPayment}
-              className="flex items-center justify-center px-4 py-2 border border-[#A67B5B] text-[#A67B5B] rounded-md hover:bg-[#F5EFE7] transition-colors"
-            >
-              <ArrowDownRight className="h-4 w-4 mr-2" />
-              Withdraw Funds
-            </button>
-          </div>
-        )}
+        <button
+          onClick={handleNavigateToPayment}
+          className="flex items-center justify-center px-4 py-2 bg-[#A67B5B] text-white rounded-md hover:bg-[#8D6E63] transition-colors w-full sm:w-auto"
+        >
+          <Wallet className="h-4 w-4 mr-2" />
+          Manage Funds
+        </button>
       </div>
     </div>
   )

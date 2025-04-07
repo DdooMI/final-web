@@ -200,6 +200,24 @@ export const subscribeToConversationMessages = (conversationId, callback) => {
   }
 };
 
+// Get unread message count for a specific conversation
+export const getConversationUnreadCount = async (conversationId, userId) => {
+  try {
+    const q = query(
+      collection(db, 'messages'),
+      where('conversationId', '==', conversationId),
+      where('receiverId', '==', userId),
+      where('read', '==', false)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.length;
+  } catch (error) {
+    console.error('Error getting conversation unread count:', error);
+    return 0;
+  }
+};
+
 // Set up a real-time listener for user conversations
 export const subscribeToUserConversations = (userId, callback) => {
   try {
@@ -215,6 +233,7 @@ export const subscribeToUserConversations = (userId, callback) => {
       for (const docSnapshot of snapshot.docs) {
         const conversationData = docSnapshot.data();
         const participants = conversationData.participants;
+        const conversationId = docSnapshot.id;
         
         // Get the other participant's info
         const otherUserId = participants.find(id => id !== userId);
@@ -232,8 +251,11 @@ export const subscribeToUserConversations = (userId, callback) => {
           profileData = profileRef.data();
         }
 
+        // Get unread message count for this conversation
+        const unreadCount = await getConversationUnreadCount(conversationId, userId);
+
         conversations.push({
-          id: docSnapshot.id,
+          id: conversationId,
           ...conversationData,
           otherUser: {
             id: otherUserId,
@@ -242,6 +264,7 @@ export const subscribeToUserConversations = (userId, callback) => {
             photoURL: profileData.photoURL || '',
           },
           timestamp: conversationData.lastMessageTimestamp ? conversationData.lastMessageTimestamp.toDate() : new Date(),
+          unreadCount: unreadCount
         });
       }
       

@@ -179,10 +179,15 @@ function MessagesPage() {
                           {formatDistanceToNow(conversation.timestamp, { addSuffix: true })}
                         </p>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-500 truncate">
                           {conversation.lastMessageContent}
                         </p>
+                        {conversation.unreadCount > 0 && (
+                          <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-[#C19A6B] rounded-full">
+                            {conversation.unreadCount}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#C19A6B]">
                         {conversation.otherUser.role === "designer" ? "Designer" : "Client"}

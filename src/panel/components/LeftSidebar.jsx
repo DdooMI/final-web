@@ -40,7 +40,7 @@ export default function LeftSidebar() {
       <button
         ref={furnitureButtonRef}
         className={`w-12 h-12  rounded-lg flex items-center justify-center text-lg transition-colors duration-200 ${
-          showFurniturePanel ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+          showFurniturePanel ? 'bg-[#C19A6B] text-white' : 'bg-gray-200 hover:bg-gray-300'
         }`}
         onClick={toggleFurniturePanel}
         aria-label="Toggle furniture panel"
@@ -59,8 +59,8 @@ export default function LeftSidebar() {
               {furnitureCategories.beds.map((item) => (
                 <button
                   key={item.id}
-                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-colors duration-200 ${
-                    state.selectedFurnitureId === item.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md ${
+                    state.selectedFurnitureId === item.id ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 hover:bg-[#A0784A] hover:text-white'
                   }`}
                   onClick={() => handleFurnitureClick(item.id)}
                   aria-label={`Select ${item.name}`}
@@ -79,8 +79,8 @@ export default function LeftSidebar() {
               {furnitureCategories.chairs.map((item) => (
                 <button
                   key={item.id}
-                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-colors duration-200 ${
-                    state.selectedFurnitureId === item.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md ${
+                    state.selectedFurnitureId === item.id ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 hover:bg-[#A0784A] hover:text-white'
                   }`}
                   onClick={() => handleFurnitureClick(item.id)}
                   aria-label={`Select ${item.name}`}
@@ -99,8 +99,8 @@ export default function LeftSidebar() {
               {furnitureCategories.sofas.map((item) => (
                 <button
                   key={item.id}
-                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-colors duration-200 ${
-                    state.selectedFurnitureId === item.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+                  className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md ${
+                    state.selectedFurnitureId === item.id ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 hover:bg-[#A0784A] hover:text-white'
                   }`}
                   onClick={() => handleFurnitureClick(item.id)}
                   aria-label={`Select ${item.name}`}

@@ -66,7 +66,6 @@ function App() {
         <Route path="/client-request" element={<ClientRequestPage />} />
         <Route path="/client-requests" element={<ClientRequestsPage />} />
         <Route path="/client-designers" element={<ClientDesignersPage />} />
- 
         <Route path="/designer-requests" element={<DesignerRequestsPage />} />
         <Route path="/designer-proposals" element={<DesignerProposalsPage />} />
    
