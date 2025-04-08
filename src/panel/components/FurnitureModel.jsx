@@ -3,10 +3,10 @@ import React, { useEffect, useMemo, useRef } from 'react';
 
 // Define all furniture models with their paths
 const FURNITURE_MODELS = {
-  '/models/chair.glb': { name: 'Chair' },
-  '/models/sofa.glb': { name: 'Sofa' },
-  '/models/ikea_idanas_single_bed.glb': { name: 'IKEA Bed' },
-  '/models/bed.glb': { name: 'Bed' }
+  'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb': { name: 'Chair' },
+  'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb': { name: 'Sofa' },
+  'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb': { name: 'IKEA Bed' },
+  'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb': { name: 'Bed' }
 };
 
 // Preload all models immediately to prevent freezing during placement

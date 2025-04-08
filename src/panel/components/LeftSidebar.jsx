@@ -4,14 +4,14 @@ import { useState, useRef } from 'react';
 // Furniture items organized by category
 const furnitureCategories = {
   beds: [
-    { id: 'ikea_bed', name: 'IKEA Bed', modelPath: 'src/models/ikea_idanas_single_bed.glb', emoji: '🛌' },
-    { id: 'bed', name: 'Bed', modelPath: 'src/models/bed.glb', emoji: '🛏️' },
+    { id: 'ikea_bed', name: 'IKEA Bed', modelPath: 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb', emoji: '🛌' },
+    { id: 'bed', name: 'Bed', modelPath: 'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb', emoji: '🛏️' },
   ],
   chairs: [
-    { id: 'chair', name: 'Chair', modelPath: 'src/models/chair.glb', emoji: '🪑' },
+    { id: 'chair', name: 'Chair', modelPath: 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb', emoji: '🪑' },
   ],
   sofas: [
-    { id: 'sofa', name: 'Sofa', modelPath: 'src/models/sofa.glb', emoji: '🛋️' },
+    { id: 'sofa', name: 'Sofa', modelPath: 'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb', emoji: '🛋️' },
   ],
 };
 

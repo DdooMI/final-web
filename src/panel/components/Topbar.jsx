@@ -1,11 +1,11 @@
-import { useScene } from '../context/SceneContext'
+import { saveAs } from 'file-saver'
 import { useEffect } from 'react'
+import { toast } from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../zustand/auth'
-import { saveAs } from 'file-saver'
-import { toast } from 'react-hot-toast'
+import { useScene } from '../context/SceneContext'
 
-export default function TopBar() {
+export default function Topbar() {
   const { state, dispatch } = useScene()
   const { role } = useAuth()
 
@@ -14,10 +14,13 @@ export default function TopBar() {
     // Save the current state to localStorage
     const saveStateToLocalStorage = () => {
       const stateToSave = {
-        objects: state.objects,
+        objects: state.objects.map(obj => ({
+          ...obj,
+          type: obj.type || obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
+        })),
         walls: state.walls,
         floors: state.floors,
-        
+        houseDimensions: state.houseDimensions
       }
       localStorage.setItem('homeDesign', JSON.stringify(stateToSave))
       console.log('State saved to localStorage')
@@ -33,7 +36,7 @@ export default function TopBar() {
     return () => {
       window.removeEventListener('beforeunload', saveStateToLocalStorage)
     }
-  }, [state.objects, state.walls, state.floors, ])
+  }, [state.objects, state.walls, state.floors, state.houseDimensions])
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' })
@@ -51,6 +54,9 @@ export default function TopBar() {
         walls: state.walls,
         floors: state.floors
       }
+      
+      // Stringify the sceneData object before inserting it into the template
+      const sceneDataJSON = JSON.stringify(sceneData, null, 2);
 
       const htmlContent = `
 <!DOCTYPE html>
@@ -71,21 +77,29 @@ export default function TopBar() {
             font-family: Arial, sans-serif;
             font-size: 18px;
             color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #error-message {
+            color: #ff4444;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Loading 3D Models...</div>
+    <div id="loading">Loading 3D Models...<div id="error-message"></div></div>
     <script>
-        const sceneData = ${JSON.stringify(sceneData)};
+        const sceneData = ${sceneDataJSON};
 
         // Initialize Three.js scene
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xffffff);
+        scene.background = new THREE.Color(0xf5f5f5);
 
         // Set up camera
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(15, 15, 15);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 20, 20);
         camera.lookAt(0, 0, 0);
 
         // Set up renderer with shadows
@@ -93,40 +107,72 @@ export default function TopBar() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Add OrbitControls
+        // Add OrbitControls with better defaults
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
+        controls.minDistance = 5;
+        controls.maxDistance = 50;
+        controls.maxPolarAngle = Math.PI / 2;
 
-        // Add lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        // Enhanced lighting setup
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(10, 10, 10);
+        directionalLight.position.set(15, 15, 15);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
         directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.bias = -0.0001;
         scene.add(directionalLight);
 
-        // Add Grid Helper
-        const size = 20;
-        const divisions = 20;
-        const gridHelper = new THREE.GridHelper(size, divisions, 0x808080, 0xcccccc);
+        // Add Grid Helper with better visibility
+        const size = 30;
+        const divisions = 30;
+        const gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0xcccccc);
+        gridHelper.material.opacity = 0.5;
+        gridHelper.material.transparent = true;
         scene.add(gridHelper);
+
+        // Update loading status function
+        const updateLoadingStatus = (message, isError = false) => {
+            const loadingElement = document.getElementById('loading');
+            const errorElement = document.getElementById('error-message');
+            if (loadingElement) {
+                if (isError) {
+                    errorElement.textContent = message;
+                } else {
+                    loadingElement.firstChild.textContent = message;
+                    errorElement.textContent = '';
+                }
+            }
+        };
 
         // Load and render scene data
         async function loadScene() {
             const loader = new THREE.GLTFLoader();
-            const modelPaths = {
-                'sofa': 'src/models/sofa.glb',
-                'chair': 'src/models/chair.glb',
-                'bed': 'src/models/bed.glb'
-            };
+            loader.crossOrigin = 'anonymous';
 
-            // Load walls
+            const modelPaths = {
+                'sofa': 'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb',
+                'chair': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb',
+                'bed': 'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb',
+                'ikea_bed': 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb',
+                'furniture': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb' // Using chair as a fallback for generic furniture
+            };
+            
+            let loadedModels = 0;
+            const totalModels = sceneData.objects.length;
+            
+            updateLoadingStatus('Initializing scene and loading models...');
+
+            // Load walls with enhanced materials
             sceneData.walls.forEach(wall => {
                 const length = Math.sqrt(
                     Math.pow(wall.end.x - wall.start.x, 2) + Math.pow(wall.end.z - wall.start.z, 2)
@@ -135,9 +181,10 @@ export default function TopBar() {
                 
                 const geometry = new THREE.BoxGeometry(length, 3, 0.2);
                 const material = new THREE.MeshStandardMaterial({
-                    color: wall.color || 0x808080,
-                    roughness: 0.7,
-                    metalness: 0.1
+                    color: wall.color || 0xcccccc,
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    envMapIntensity: 1
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 
@@ -152,14 +199,15 @@ export default function TopBar() {
                 scene.add(mesh);
             });
 
-            // Load floors
+            // Load floors with enhanced materials
             sceneData.floors.forEach(floor => {
                 const geometry = new THREE.PlaneGeometry(floor.size, floor.length || floor.size);
                 const material = new THREE.MeshStandardMaterial({
-                    color: floor.color || 0x808080,
+                    color: floor.color || 0xeeeeee,
                     side: THREE.DoubleSide,
                     roughness: 0.8,
-                    metalness: 0.1
+                    metalness: 0.2,
+                    envMapIntensity: 1
                 });
                 const mesh = new THREE.Mesh(geometry, material);
                 
@@ -169,65 +217,86 @@ export default function TopBar() {
                 scene.add(mesh);
             });
 
-            // Load 3D models for furniture
+            // Load 3D models for furniture with enhanced error handling
             for (const obj of sceneData.objects) {
                 try {
+                    // Check if the model type exists in our paths
+                    if (!modelPaths[obj.type]) {
+                        console.warn('Unknown model type: ' + obj.type + '. Using chair as fallback.');
+                        updateLoadingStatus('Unknown model type: ' + obj.type + '. Using chair as fallback.', false);
+                    }
+                    
+                    // Use the specific model if available, otherwise fallback to chair
                     const modelPath = modelPaths[obj.type] || modelPaths['chair'];
+                    updateLoadingStatus('Loading model ' + (loadedModels + 1) + '/' + totalModels + ': ' + obj.type);
+                    
                     const gltf = await loader.loadAsync(modelPath);
                     const model = gltf.scene;
+                    loadedModels++;
+                    updateLoadingStatus('Successfully loaded ' + loadedModels + '/' + totalModels + ' models');
 
-                    // Apply position, rotation, and scale
+                    // Apply transformations
                     model.position.set(obj.position.x, obj.position.y || 0, obj.position.z);
                     if (obj.rotation) {
                         model.rotation.set(0, obj.rotation, 0);
                     }
                     if (obj.scale) {
-                        model.scale.set(obj.scale, obj.scale, obj.scale);
+                        const scale = typeof obj.scale === 'number' ? obj.scale : 1;
+                        model.scale.set(scale, scale, scale);
                     }
 
-                    // Apply material color if specified
-                    if (obj.color) {
-                        model.traverse((child) => {
-                            if (child.isMesh) {
+                    // Apply material color and enhanced materials
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (obj.color) {
                                 child.material.color.setHex(obj.color.replace('#', '0x'));
                             }
-                        });
-                    }
-
-                    model.traverse((node) => {
-                        if (node.isMesh) {
-                            node.castShadow = true;
-                            node.receiveShadow = true;
+                            child.material.roughness = 0.7;
+                            child.material.metalness = 0.3;
+                            child.material.envMapIntensity = 1;
                         }
                     });
 
                     scene.add(model);
                 } catch (error) {
-                    console.error('Error loading model for object:', error);
+                    console.error('Error loading model ' + obj.type + ':', error);
+                    updateLoadingStatus('Error loading model ' + obj.type + '. Please check the model path and try again.', true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             }
 
-            // Hide loading message
-            document.getElementById('loading').style.display = 'none';
+            // Hide loading message only if at least one model was loaded successfully
+            if (loadedModels > 0) {
+                document.getElementById('loading').style.display = 'none';
+            }
         }
 
-        // Animation loop
+        // Enhanced animation loop with stats
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         }
 
+        // Initialize scene with error handling
         loadScene().then(() => {
             animate();
+        }).catch(error => {
+            console.error('Scene initialization error:', error);
+            updateLoadingStatus('Failed to initialize scene. Please refresh the page.', true);
         });
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
+        // Enhanced window resize handling
+        function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+            renderer.setPixelRatio(window.devicePixelRatio);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
     </script>
 </body>
 </html>`;

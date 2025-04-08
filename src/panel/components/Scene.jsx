@@ -247,11 +247,11 @@ export default function Scene() {
   useEffect(() => {
     if (state.activeShape === "furniture" && state.selectedFurnitureId) {
       const furnitureCategories = {
-        ikea_bed: "src/models/ikea_idanas_single_bed.glb",
-        bed: "src/models/bed.glb",
-        chair: "src/models/chair.glb",
-        sofa: "src/models/sofa.glb",
-        table: "src/models/table.glb",
+        ikea_bed: "https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb",
+        bed: "https://raw.githubusercontent.com/DdooMI/models/main/bed.glb",
+        chair: "https://raw.githubusercontent.com/DdooMI/models/main/chair.glb",
+        sofa: "https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb",
+        table: "https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb", // Using sofa as fallback since table model wasn't found
       };
 
       const modelPath = furnitureCategories[state.selectedFurnitureId];

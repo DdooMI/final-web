@@ -4,33 +4,7 @@ const SceneContext = createContext();
 
 // Load initial state from localStorage or use default values
 const loadInitialState = () => {
-  const savedState = localStorage.getItem("homeDesign");
-  if (savedState) {
-    const parsed = JSON.parse(savedState);
-    return {
-      objects: parsed.objects || [],
-      walls: parsed.walls || [],
-      floors: parsed.floors || [],
-      history: [],
-      currentStep: -1,
-      activeShape: null,
-      activeColor: "#808080",
-      isRotationEnabled: true,
-      selectedFurnitureId: null,
-      occupiedGridCells: {},
-      houseDimensions: {
-        width: 0,
-        length: 0,
-        height: 3,
-        isApplied: false,
-        error: null,
-      },
-      metadata: parsed.metadata || {
-        lastImport: null,
-        lastExport: null,
-      },
-    };
-  }
+  localStorage.removeItem("homeDesign");
   return {
     objects: [],
     walls: [],
