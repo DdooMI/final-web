@@ -5,6 +5,7 @@ import { useState, useRef } from 'react';
 const furnitureCategories = {
   beds: [
     { id: 'ikea_bed', name: 'IKEA Bed', modelPath: 'src/models/ikea_idanas_single_bed.glb', emoji: '🛌' },
+    { id: 'bed', name: 'Bed', modelPath: 'src/models/bed.glb', emoji: '🛏️' },
   ],
   chairs: [
     { id: 'chair', name: 'Chair', modelPath: 'src/models/chair.glb', emoji: '🪑' },

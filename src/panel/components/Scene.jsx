@@ -122,6 +122,34 @@ export default function Scene() {
   const [furniturePreview, setFurniturePreview] = useState(null);
   const [previewRotation, setPreviewRotation] = useState(0);
 
+  // Add ambient light to illuminate the entire scene
+  const ambientLight = useMemo(() => new THREE.AmbientLight(0xffffff, 0.5), []);
+
+  // Add directional light for shadows and better depth perception
+  const directionalLight = useMemo(() => {
+    const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    light.position.set(10, 10, 10);
+    light.castShadow = true;
+    return light;
+  }, []);
+
+  // Add lights to the scene
+  useEffect(() => {
+    if (planeRef.current) {
+      const scene = planeRef.current.parent;
+      scene.add(ambientLight);
+      scene.add(directionalLight);
+      
+      // Set background color to white
+      scene.background = new THREE.Color(0xffffff);
+
+      return () => {
+        scene.remove(ambientLight);
+        scene.remove(directionalLight);
+      };
+    }
+  }, [ambientLight, directionalLight]);
+
   // Handle keyboard events for furniture rotation
   useEffect(() => {
     const handleKeyPress = (event) => {
@@ -220,6 +248,7 @@ export default function Scene() {
     if (state.activeShape === "furniture" && state.selectedFurnitureId) {
       const furnitureCategories = {
         ikea_bed: "src/models/ikea_idanas_single_bed.glb",
+        bed: "src/models/bed.glb",
         chair: "src/models/chair.glb",
         sofa: "src/models/sofa.glb",
         table: "src/models/table.glb",
@@ -234,6 +263,10 @@ export default function Scene() {
 
         switch (state.selectedFurnitureId) {
           case "ikea_bed":
+            furnitureSize = { width: 1, length: 2 };
+            furnitureScale = 1;
+            break;
+          case "bed":
             furnitureSize = { width: 1, length: 2 };
             furnitureScale = 1;
             break;

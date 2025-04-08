@@ -1,10 +1,5 @@
 import { useScene } from '../context/SceneContext';
 import { useState, useEffect, useRef } from 'react';
-import useStore from '../store';
-import * as THREE from 'three';
-import { saveDesignAsHtml } from '../utils/saveDesignAsHtml';
-import { toast } from 'react-hot-toast';
-
 const shapes = [
   { id: 'wall', name: 'Wall', icon: '▭' },
   { id: 'floor', name: 'Floor', icon: '▢' },
@@ -230,38 +225,7 @@ export default function RightSidebar() {
           {(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? '' : 'Design Tools'}
         </h2>
         <div ref={toolbarContainerRef} className={`flex ${(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? 'flex-col items-center' : 'overflow-x-auto scrollbar-thin scrollbar-track-gray-100 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-500'} gap-3 mt-3 pb-1`}>
-          <button
-            className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 bg-green-600 text-white hover:bg-green-700 border border-green-500`}
-            onClick={() => {
-              try {
-                // Get the current scene data from state
-                const sceneData = {
-                  objects: state.objects,
-                  walls: state.walls,
-                  floors: state.floors,
-                  houseDimensions: state.houseDimensions,
-                  metadata: {
-                    exportDate: new Date().toISOString(),
-                    version: "1.0",
-                    projectName: `interior-design-${Date.now()}`
-                  }
-                };
-                
-                // Save the design as HTML
-                saveDesignAsHtml(sceneData, `interior-design-${Date.now()}`);
-                toast.success("3D design saved as HTML successfully!");
-              } catch (error) {
-                console.error("Error saving design as HTML:", error);
-                toast.error("Failed to save design: " + (error.message || "Unknown error"));
-              }
-            }}
-            title="Save Design as HTML"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            {(!showDimensionsPanel && !showColorPicker && !showShapesPanel) ? '' : 'Save Design'}
-          </button>
+          
           <button
             className={`px-4 py-2 text-sm rounded-lg transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0 ${isRotationEnabled ? 'bg-[#C19A6B] text-white font-medium' : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'}`}
             onClick={handleRotationToggle}

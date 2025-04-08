@@ -3,9 +3,10 @@ import React, { useEffect, useMemo, useRef } from 'react';
 
 // Define all furniture models with their paths
 const FURNITURE_MODELS = {
-  'src/models/chair.glb': { name: 'Chair' },
-  'src/models/sofa.glb': { name: 'Sofa' },
-  'src/models/ikea_idanas_single_bed.glb': { name: 'IKEA Bed' }
+  '/models/chair.glb': { name: 'Chair' },
+  '/models/sofa.glb': { name: 'Sofa' },
+  '/models/ikea_idanas_single_bed.glb': { name: 'IKEA Bed' },
+  '/models/bed.glb': { name: 'Bed' }
 };
 
 // Preload all models immediately to prevent freezing during placement
