@@ -1,5 +1,7 @@
+/* eslint-disable react/no-unknown-property */
+/* eslint-disable react/prop-types */
 import { useGLTF } from '@react-three/drei';
-import React, { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 // Define all furniture models with their paths
 const FURNITURE_MODELS = {

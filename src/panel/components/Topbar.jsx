@@ -1,13 +1,29 @@
 import { saveAs } from 'file-saver'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../zustand/auth'
 import { useScene } from '../context/SceneContext'
+import { doc, updateDoc, getDoc } from 'firebase/firestore'
+import { db } from '../../firebase/firebaseConfig'
 
 export default function Topbar() {
   const { state, dispatch } = useScene()
-  const { role } = useAuth()
+  const { user, role } = useAuth()
+  const [proposalId, setProposalId] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Extract proposal ID from URL if available
+  useEffect(() => {
+    // Check if we're in a project context (from a specific request/proposal)
+    const params = new URLSearchParams(location.search)
+    const id = params.get('proposalId')
+    if (id) {
+      setProposalId(id)
+    }
+  }, [location])
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -16,7 +32,7 @@ export default function Topbar() {
       const stateToSave = {
         objects: state.objects.map(obj => ({
           ...obj,
-          type: obj.type || obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
+          type: obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
         })),
         walls: state.walls,
         floors: state.floors,
@@ -46,14 +62,80 @@ export default function Topbar() {
     dispatch({ type: 'REDO' })
   }
 
-  const handleSaveDesign = () => {
+  // Function to save design to Firebase
+  const saveDesignToFirebase = async () => {
+    if (!user || !proposalId) {
+      toast.error('Unable to save to project. Missing user or project information.');
+      return false;
+    }
+
+    setIsSaving(true);
+    try {
+      // Prepare the design data
+      const designData = {
+        objects: state.objects.map(obj => ({
+          ...obj,
+          type: obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
+        })),
+        walls: state.walls,
+        floors: state.floors,
+        houseDimensions: state.houseDimensions,
+        lastUpdated: new Date(),
+        updatedBy: user.uid
+      };
+
+      // Get the proposal document reference
+      const proposalRef = doc(db, 'designProposals', proposalId);
+      
+      // Check if the proposal exists and user has permission
+      const proposalSnap = await getDoc(proposalRef);
+      if (!proposalSnap.exists()) {
+        toast.error('Project not found');
+        return false;
+      }
+      
+      const proposalData = proposalSnap.data();
+      // Verify user has permission (either client or designer of this proposal)
+      if (proposalData.clientId !== user.uid && proposalData.designerId !== user.uid) {
+        toast.error('You do not have permission to save this design');
+        return false;
+      }
+      
+      // Update the proposal with the design data
+      await updateDoc(proposalRef, {
+        designData: designData,
+        lastModified: new Date()
+      });
+      
+      toast.success('Design saved successfully to project');
+      return true;
+    } catch (error) {
+      console.error('Error saving design to Firebase:', error);
+      toast.error('Failed to save design to project');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle saving design (to both Firebase and as HTML file)
+  const handleSaveDesign = async () => {
+    // First save to Firebase if we have a proposal ID
+    if (proposalId) {
+      await saveDesignToFirebase();
+    }
+    
     try {
       // Create HTML content with Three.js scene
       const sceneData = {
-        objects: state.objects,
+        objects: state.objects.map(obj => ({
+          ...obj,
+          type: obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
+        })),
         walls: state.walls,
-        floors: state.floors
-      }
+        floors: state.floors,
+        houseDimensions: state.houseDimensions
+      };
       
       // Stringify the sceneData object before inserting it into the template
       const sceneDataJSON = JSON.stringify(sceneData, null, 2);
@@ -163,7 +245,7 @@ export default function Topbar() {
                 'sofa': 'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb',
                 'chair': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb',
                 'bed': 'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb',
-                'ikea_bed': 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb',
+                'ikea_idanas_single_bed': 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb',
                 'furniture': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb' // Using chair as a fallback for generic furniture
             };
             
@@ -311,8 +393,87 @@ export default function Topbar() {
     }
   }
 
-  // Determine dashboard link based on user role
-  const dashboardLink = role === 'designer' ? '/designer-requests' : '/client-requests';
+  // Load design data from Firebase when proposal ID changes
+  useEffect(() => {
+    const loadDesignFromFirebase = async () => {
+      if (!user || !proposalId) return;
+      
+      try {
+        // Get the proposal document
+        const proposalRef = doc(db, 'designProposals', proposalId);
+        const proposalSnap = await getDoc(proposalRef);
+        
+        if (!proposalSnap.exists()) {
+          console.error('Project not found');
+          return;
+        }
+        
+        const proposalData = proposalSnap.data();
+        
+        // Check if there's design data to load
+        if (proposalData.designData) {
+          // Load the design data into the scene
+          dispatch({ 
+            type: 'IMPORT_DESIGN', 
+            payload: proposalData.designData 
+          });
+          toast.success('Project design loaded successfully');
+          
+          // Also save to localStorage for backup
+          localStorage.setItem('homeDesign', JSON.stringify(proposalData.designData));
+        }
+      } catch (error) {
+        console.error('Error loading design from Firebase:', error);
+        toast.error('Failed to load project design');
+      }
+    };
+    
+    loadDesignFromFirebase();
+  }, [proposalId, user, dispatch]);
+  
+  // Function to save current state to Firebase whenever it changes
+  useEffect(() => {
+    // Only save to Firebase if we have a user and proposalId
+    if (user && proposalId && state.objects.length > 0) {
+      const saveStateToFirebase = async () => {
+        try {
+          // Prepare the design data
+          const designData = {
+            objects: state.objects.map(obj => ({
+              ...obj,
+              type: obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair' // Ensure type is preserved
+            })),
+            walls: state.walls,
+            floors: state.floors,
+            houseDimensions: state.houseDimensions,
+            lastUpdated: new Date(),
+            updatedBy: user.uid
+          };
+          
+          // Get the proposal document reference
+          const proposalRef = doc(db, 'designProposals', proposalId);
+          
+          // Update the proposal with the design data
+          await updateDoc(proposalRef, {
+            designData: designData,
+            lastModified: new Date()
+          });
+          
+          console.log('Design state automatically saved to Firebase');
+        } catch (error) {
+          console.error('Error auto-saving design to Firebase:', error);
+        }
+      };
+      
+      // Debounce the save operation to avoid too many writes
+      const timeoutId = setTimeout(saveStateToFirebase, 5000); // Save after 5 seconds of inactivity
+      
+      return () => clearTimeout(timeoutId); // Clean up timeout
+    }
+  }, [state.objects, state.walls, state.floors, state.houseDimensions, user, proposalId]);
+
+  // Determine dashboard link based on user role and project ID
+  const dashboardLink = proposalId ? `/project/${proposalId}` : (role === 'designer' ? '/designer-requests' : '/client-requests');
 
   return (
     <div className="absolute top-4 left-0 right-0 mx-auto max-w-5xl bg-white/90 backdrop-blur-sm p-4 rounded-lg shadow-lg flex justify-between transition-all duration-300 ease-in-out hover:bg-white hover:shadow-xl">
@@ -348,13 +509,26 @@ export default function Topbar() {
           </svg>
         </button>
         <button 
-          className="px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] flex items-center gap-2 transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md"
+          className="px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] flex items-center gap-2 transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
           onClick={handleSaveDesign}
+          disabled={isSaving}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          Save Design
+          {isSaving ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving...
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+              Save Design
+            </>
+          )}
         </button>
       </div>
     </div>

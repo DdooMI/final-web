@@ -140,8 +140,253 @@ function DesignerProposalsPage() {
       
       const proposalData = proposalSnap.data();
       
+      // Get the HTML content from localStorage
+      const designState = localStorage.getItem('homeDesign');
+      if (!designState) {
+        throw new Error("No design data found");
+      }
+
+      // Create HTML content
+      const sceneData = JSON.parse(designState);
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interior Design Scene</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { width: 100%; height: 100vh; }
+        #loading { 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #error-message {
+            color: #ff4444;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading 3D Models...<div id="error-message"></div></div>
+    <script>
+        const sceneData = ${JSON.stringify(sceneData, null, 2)};
+
+        // Initialize Three.js scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf5f5f5);
+
+        // Set up camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 20, 20);
+        camera.lookAt(0, 0, 0);
+
+        // Set up renderer with shadows
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // Add OrbitControls with better defaults
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 5;
+        controls.maxDistance = 50;
+        controls.maxPolarAngle = Math.PI / 2;
+
+        // Enhanced lighting setup
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(15, 15, 15);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.bias = -0.0001;
+        scene.add(directionalLight);
+
+        // Add Grid Helper with better visibility
+        const size = 30;
+        const divisions = 30;
+        const gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0xcccccc);
+        gridHelper.material.opacity = 0.5;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+
+        // Update loading status function
+        const updateLoadingStatus = (message, isError = false) => {
+            const loadingElement = document.getElementById('loading');
+            const errorElement = document.getElementById('error-message');
+            if (loadingElement) {
+                if (isError) {
+                    errorElement.textContent = message;
+                } else {
+                    loadingElement.firstChild.textContent = message;
+                    errorElement.textContent = '';
+                }
+            }
+        };
+
+        // Load and render scene data
+        async function loadScene() {
+            const loader = new THREE.GLTFLoader();
+            loader.crossOrigin = 'anonymous';
+
+            const modelPaths = {
+                'sofa': 'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb',
+                'chair': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb',
+                'bed': 'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb',
+                'ikea_idanas_single_bed': 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb',
+                'furniture': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb'
+            };
+            
+            let loadedModels = 0;
+            const totalModels = sceneData.objects.length;
+            
+            updateLoadingStatus('Initializing scene and loading models...');
+
+            // Load walls with enhanced materials
+            sceneData.walls.forEach(wall => {
+                const length = Math.sqrt(
+                    Math.pow(wall.end.x - wall.start.x, 2) + Math.pow(wall.end.z - wall.start.z, 2)
+                );
+                const angle = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
+                
+                const geometry = new THREE.BoxGeometry(length, 3, 0.2);
+                const material = new THREE.MeshStandardMaterial({
+                    color: wall.color || 0xcccccc,
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    envMapIntensity: 1
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                mesh.position.set(
+                    (wall.start.x + wall.end.x) / 2,
+                    1.5,
+                    (wall.start.z + wall.end.z) / 2
+                );
+                mesh.rotation.y = angle;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            });
+
+            // Load floors with enhanced materials
+            sceneData.floors.forEach(floor => {
+                const geometry = new THREE.PlaneGeometry(floor.size, floor.length || floor.size);
+                const material = new THREE.MeshStandardMaterial({
+                    color: floor.color || 0xeeeeee,
+                    side: THREE.DoubleSide,
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    envMapIntensity: 1
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                mesh.position.set(floor.position.x, 0.01, floor.position.z);
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            });
+
+            // Load 3D models for furniture with enhanced error handling
+            for (const obj of sceneData.objects) {
+                try {
+                    if (!modelPaths[obj.type]) {
+                        console.warn('Unknown model type: ' + obj.type + '. Using chair as fallback.');
+                        updateLoadingStatus('Unknown model type: ' + obj.type + '. Using chair as fallback.', false);
+                    }
+                    
+                    const modelPath = modelPaths[obj.type] || modelPaths['chair'];
+                    updateLoadingStatus('Loading model ' + (loadedModels + 1) + '/' + totalModels + ': ' + obj.type);
+                    
+                    const gltf = await loader.loadAsync(modelPath);
+                    const model = gltf.scene;
+                    loadedModels++;
+                    updateLoadingStatus('Successfully loaded ' + loadedModels + '/' + totalModels + ' models');
+
+                    model.position.set(obj.position.x, obj.position.y || 0, obj.position.z);
+                    if (obj.rotation) {
+                        model.rotation.set(0, obj.rotation, 0);
+                    }
+                    if (obj.scale) {
+                        const scale = typeof obj.scale === 'number' ? obj.scale : 1;
+                        model.scale.set(scale, scale, scale);
+                    }
+
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (obj.color) {
+                                child.material.color.setHex(obj.color.replace('#', '0x'));
+                            }
+                            child.material.roughness = 0.7;
+                            child.material.metalness = 0.3;
+                            child.material.envMapIntensity = 1;
+                        }
+                    });
+
+                    scene.add(model);
+                } catch (error) {
+                    console.error('Error loading model ' + obj.type + ':', error);
+                    updateLoadingStatus('Error loading model ' + obj.type + '. Please check the model path and try again.', true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            if (loadedModels > 0) {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        loadScene().then(() => {
+            animate();
+        }).catch(error => {
+            console.error('Scene initialization error:', error);
+            updateLoadingStatus('Failed to initialize scene. Please refresh the page.', true);
+        });
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+    </script>
+</body>
+</html>`;
+
+      // Update proposal with completed status and HTML content
       await updateDoc(proposalRef, {
         status: "completed",
+        htmlContent: htmlContent
       });
 
       // Update the request status to completed

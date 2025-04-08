@@ -511,6 +511,58 @@ function sceneReducer(state, action) {
         },
       };
 
+    case "IMPORT_DESIGN":
+      if (!action.payload) return state;
+      
+      // Ensure all imported objects have proper IDs and types
+      const importedObjects = (action.payload.objects || []).map(obj => ({
+        ...obj,
+        id: obj.id || Date.now() + Math.random(),
+        type: obj.type || obj.modelPath?.split('/')?.pop()?.split('.')[0] || 'chair'
+      }));
+
+      // Ensure all imported walls have proper IDs and colors
+      const importedWalls = (action.payload.walls || []).map(wall => ({
+        ...wall,
+        id: wall.id || Date.now() + Math.random(),
+        color: wall.color || state.activeColor
+      }));
+
+      // Ensure all imported floors have proper IDs and colors
+      const importedFloors = (action.payload.floors || []).map(floor => ({
+        ...floor,
+        id: floor.id || Date.now() + Math.random(),
+        color: floor.color || state.activeColor
+      }));
+
+      // Import house dimensions with validation
+      const importedDimensions = action.payload.houseDimensions || state.houseDimensions;
+
+      return {
+        ...state,
+        objects: importedObjects,
+        walls: importedWalls,
+        floors: importedFloors,
+        houseDimensions: importedDimensions,
+        history: [
+          ...state.history,
+          {
+            type: "IMPORT_DESIGN",
+            data: {
+              objects: importedObjects,
+              walls: importedWalls,
+              floors: importedFloors,
+              houseDimensions: importedDimensions
+            }
+          }
+        ],
+        currentStep: state.history.length,
+        metadata: {
+          ...state.metadata,
+          lastImport: new Date().toISOString()
+        }
+      };
+
     default:
       return state;
   }

@@ -683,7 +683,7 @@ function ProjectPage() {
                   </button>
                   
                   <button
-                    onClick={() => navigate('/projects')}
+                    onClick={() => navigate(`/projects?proposalId=${proposalId}`)}
                     className="w-full px-5 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
                   >
                     <FiSettings />

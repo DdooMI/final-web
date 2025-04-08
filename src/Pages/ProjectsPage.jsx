@@ -1,5 +1,6 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
+import { useLocation } from 'react-router-dom'
 
 import CameraSetup from '../panel/components/CameraSetup'
 import Compass, { Compass3D } from '../panel/components/Compass'
@@ -10,15 +11,21 @@ import TopBar from '../panel/components/Topbar'
 import { SceneProvider, useScene } from '../panel/context/SceneContext'
 
 function ProjectPage() {
+  const location = useLocation()
+  
+  // Extract proposalId from URL query parameters if available
+  const queryParams = new URLSearchParams(location.search)
+  const proposalId = queryParams.get('proposalId')
+  
   return (
     <SceneProvider>
-      <AppContent />
+      <AppContent proposalId={proposalId} />
     </SceneProvider>
   )
 }
 
 // This component is inside the SceneProvider, so it can use useScene
-function AppContent() {
+function AppContent({ proposalId }) {
   const { state } = useScene();
   
   return (

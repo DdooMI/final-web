@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { formatDistanceToNow } from "date-fns";
-import { FiMessageSquare, FiCheck, FiX } from "react-icons/fi";
+import { FiMessageSquare, FiCheck, FiX, FiEye } from "react-icons/fi";
 
 import { db } from "../firebase/firebaseConfig";
 import { createNotification } from "../firebase/notifications";
@@ -151,6 +151,11 @@ function ClientRequestsPage() {
     } finally {
       setUpdateLoading(false);
     }
+  };
+
+  // Handle viewing design preview
+  const handleViewDesign = (proposalId) => {
+    navigate(`/design-preview/${proposalId}`);
   };
 
 
@@ -477,6 +482,15 @@ function ClientRequestsPage() {
                                 <span>Reject</span>
                               </button>
                             </div>
+                          )}
+                          {proposal.status === "completed" && (
+                            <button
+                              onClick={() => handleViewDesign(proposal.id)}
+                              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition flex items-center gap-2 shadow-sm font-medium"
+                            >
+                              <FiEye className="text-white" />
+                              <span>View Design</span>
+                            </button>
                           )}
                         </div>
                       </div>
