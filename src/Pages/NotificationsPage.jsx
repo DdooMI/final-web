@@ -181,8 +181,13 @@ function NotificationsPage() {
                       
                       // Navigate to the appropriate page based on notification type, related ID, and user role
                       if (notification.relatedId) {
+                        // Check if it's a Project Completed notification
+                        if (notification.title.includes("Project Completed by Designer") || notification.title.includes("Project Marked as Completed")) {
+                          // Navigate directly to the project page
+                          window.location.href = `/project/${notification.relatedId}`;
+                        }
                         // Check if it's any proposal-related notification for a designer
-                        if (role === "designer" && notification.title.includes("Proposal")) {
+                        else if (role === "designer" && notification.title.includes("Proposal")) {
                           // Navigate to designer proposals page for designers
                           window.location.href = `/designer-proposals?proposalId=${notification.relatedId}`;
                         } else {

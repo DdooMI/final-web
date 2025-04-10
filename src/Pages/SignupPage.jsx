@@ -47,12 +47,13 @@ function Signup() {
   } = useForm({
     resolver: zodResolver(schema),
   });
-  const { signUp } = useAuth();
+  const { signUp, error } = useAuth();
   const navigate = useNavigate();
 
   const onSubmit = async (data) => {
     setIsLoading(true);
     try {
+      console.log(data);
       await signUp(data, navigate);
     } catch (error) {
       console.error(error);
@@ -110,7 +111,7 @@ function Signup() {
               <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A67B5B]" />
             </div>
             <p className="text-red-500 text-sm text-left">
-              {errors.email?.message}
+              {errors.email?.message || error}
             </p>
 
             <div className="relative">

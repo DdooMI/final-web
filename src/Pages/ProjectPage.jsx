@@ -15,12 +15,11 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { createNotification } from "../firebase/notifications";
-import { transferFundsToDesigner } from "../firebase/storage";
-import { FiMessageSquare, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiDollarSign } from "react-icons/fi";
+import { runTransaction } from "firebase/firestore";
+import { FiMessageSquare, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiDollarSign, FiCode } from "react-icons/fi";
 import { formatDistanceToNow } from "date-fns";
-import ModelUploader from "../Components/ModelUploader";
-import ModelDownloader from "../Components/ModelDownloader";
 import DesignerRating from "../Components/DesignerRating";
+import ImageZoomModal from "../Components/ImageZoomModal";
 
 function ProjectPage() {
   const { proposalId } = useParams();
@@ -39,7 +38,9 @@ function ProjectPage() {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState(false);
-  const [modelFiles, setModelFiles] = useState([]);
+  const [zoomImage, setZoomImage] = useState(null);
+  const [htmlContent, setHtmlContent] = useState('');
+  const [htmlFileName, setHtmlFileName] = useState('');
 
   useEffect(() => {
     if (user && user.uid) {
@@ -63,13 +64,14 @@ function ProjectPage() {
         }
 
         const proposalData = proposalSnap.data();
-        setProposal({
+        const processedProposal = {
           id: proposalSnap.id,
           ...proposalData,
           createdAt: proposalData.createdAt
             ? formatDistanceToNow(proposalData.createdAt.toDate(), { addSuffix: true })
-            : "Unknown date",
-        });
+            : "Unknown date"
+        };
+        setProposal(processedProposal);
 
         // Get request data
         if (proposalData.requestId) {
@@ -143,9 +145,10 @@ function ProjectPage() {
           setProjectStatus(proposalData.projectStatus);
         }
         
-        // Get model files if any
-        if (proposalData.modelFiles) {
-          setModelFiles(proposalData.modelFiles);
+        // Get HTML content if any
+        if (proposalData.htmlContent) {
+          setHtmlContent(proposalData.htmlContent);
+          setHtmlFileName(proposalData.htmlFileName || 'design.html');
         }
       } catch (err) {
         console.error("Error fetching project data:", err);
@@ -166,28 +169,51 @@ function ProjectPage() {
     setError(null);
     
     try {
-      const proposalRef = doc(db, "designProposals", proposal.id);
+      // Validate HTML content exists
+      const proposalSnap = await getDoc(doc(db, "designProposals", proposalId));
+      const content = proposalSnap.data()?.htmlContent;
+
+      if (!content) {
+        throw new Error('Please upload HTML design before marking as completed');
+      }
+
+      const proposalRef = doc(db, "designProposals", proposalId);
       
       // Update proposal status
       await updateDoc(proposalRef, {
         projectStatus: "completed_by_designer",
+        htmlUpdatedAt: serverTimestamp()
       });
+      
+      // Refresh proposal data
+      const updatedProposal = await getDoc(proposalRef);
+      if (updatedProposal.exists()) {
+        const updatedData = updatedProposal.data();
+        
+        setProposal(prev => ({
+          ...prev,
+          ...updatedData
+        }));
+      }
       
       // Create notification for client
       await createNotification({
-        userId: proposal.clientId,
+        userId: proposal?.clientId,
         title: "Project Completed by Designer",
         message: `The designer has completed your project "${request?.title || 'Design Project'}". Please review and mark it as completed if you're satisfied.`,
         type: "success",
-        relatedId: proposal.id,
+        relatedId: proposalId,
       });
       
       // Update local state
       setProjectStatus("completed_by_designer");
       
       setUpdateSuccess(true);
-      setTimeout(() => setUpdateSuccess(false), 3000);
+      setTimeout(() => {
+        setUpdateSuccess(false);
+      }, 3000);
     } catch (err) {
+      console.error('Status update failed:', err);
       setError(err.message);
     } finally {
       setUpdateLoading(false);
@@ -202,7 +228,7 @@ function ProjectPage() {
     setError(null);
     
     try {
-      const proposalRef = doc(db, "designProposals", proposal.id);
+      const proposalRef = doc(db, "designProposals", proposalId);
       
       // Update proposal status
       await updateDoc(proposalRef, {
@@ -221,11 +247,35 @@ function ProjectPage() {
       // Transfer funds from client to designer
       if (proposal.price) {
         try {
-          await transferFundsToDesigner(
-            proposal.clientId,
-            proposal.designerId,
-            parseFloat(proposal.price)
-          );
+          const clientRef = doc(db, 'users', proposal.clientId);
+          const designerRef = doc(db, 'users', proposal.designerId);
+          
+          await runTransaction(db, async (transaction) => {
+            const clientDoc = await transaction.get(clientRef);
+            const designerDoc = await transaction.get(designerRef);
+            
+            if (!clientDoc.exists() || !designerDoc.exists()) {
+              throw new Error('User documents not found');
+            }
+            
+            const clientBalance = clientDoc.data().balance || 0;
+            const transferAmount = parseFloat(proposal.price);
+            
+            if (clientBalance < transferAmount) {
+              throw new Error('Client has insufficient balance for transfer');
+            }
+            
+            // Update client balance
+            transaction.update(clientRef, {
+              balance: clientBalance - transferAmount
+            });
+            
+            // Update designer balance
+            const designerBalance = designerDoc.data().balance || 0;
+            transaction.update(designerRef, {
+              balance: designerBalance + transferAmount
+            });
+          });
           setTransferSuccess(true);
           
           // Refresh client's balance
@@ -241,7 +291,7 @@ function ProjectPage() {
       
       // Create notification for designer
       await createNotification({
-        userId: proposal.designerId,
+        userId: proposal?.designerId,
         title: "Project Marked as Completed",
         message: `The client has marked the project "${request?.title || 'Design Project'}" as completed. Thank you for your work!`,
         type: "success",
@@ -255,36 +305,46 @@ function ProjectPage() {
       setShowRatingForm(true);
       
       setUpdateSuccess(true);
-      setTimeout(() => setUpdateSuccess(false), 3000);
+      setTimeout(() => {
+        setUpdateSuccess(false);
+      }, 3000);
     } catch (err) {
+      console.error('Status update failed:', err);
       setError(err.message);
     } finally {
       setUpdateLoading(false);
     }
   };
   
-  // Handle model upload success
-  const handleModelUploadSuccess = (fileInfo) => {
-    // Update local state with the new file
-    setModelFiles(prev => [
-      ...prev,
-      {
-        fileId: fileInfo.fileId,
-        fileName: fileInfo.fileName,
-        url: fileInfo.url,
-        uploadedAt: new Date(),
-        size: 0 // Size info might not be available
-      }
-    ]);
-    
-    // Update project status
-    setProjectStatus('completed_by_designer');
-    
-    // Show success message
-    setUpdateSuccess(true);
-    setTimeout(() => setUpdateSuccess(false), 3000);
-  };
-  
+  // Handle HTML upload success
+  const handleHtmlUploadSuccess = async (fileInfo) => {
+    // Validate required fields
+    if (!fileInfo?.htmlContent) {
+      setError('Invalid file upload - missing HTML content');
+      return;
+    }
+
+    try {
+      // Update local state
+      setHtmlContent(fileInfo.htmlContent);
+      setHtmlFileName(fileInfo.fileName || 'design.html');
+
+      // Update Firestore document
+      const proposalRef = doc(db, "designProposals", proposalId);
+      await updateDoc(proposalRef, { 
+        htmlContent: fileInfo.htmlContent,
+        htmlFileName: fileInfo.fileName || 'design.html',
+        htmlUpdatedAt: serverTimestamp()
+      });
+
+      // Show success message
+      setUpdateSuccess(true);
+      setTimeout(() => setUpdateSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error saving HTML content:', err);
+      setError(err.message || 'Failed to save HTML content');
+    }
+  }
   // Handle rating submission
   const handleRatingSubmit = (ratingData) => {
     // Hide the rating form after submission
@@ -413,13 +473,6 @@ function ProjectPage() {
           </div>
           <div className="flex space-x-3">
             <button
-              onClick={startConversation}
-              className="px-4 py-2 border border-[#C19A6B] text-[#C19A6B] rounded-lg hover:bg-[#C19A6B]/10 transition-all flex items-center gap-2 shadow-sm"
-            >
-              <FiMessageSquare />
-              <span>Message</span>
-            </button>
-            <button
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all flex items-center gap-2 shadow-sm"
               onClick={() => navigate(-1)}
             >
@@ -440,87 +493,159 @@ function ProjectPage() {
           </div>
         )}
 
-        {/* Project Status Banner */}
-        <div className={`mb-6 p-6 rounded-xl shadow-md ${
-          projectStatus === "in_progress" 
-            ? "bg-blue-50 text-blue-700 border border-blue-200" 
-            : projectStatus === "completed_by_designer" 
-            ? "bg-yellow-50 text-yellow-700 border border-yellow-200" 
-            : "bg-green-50 text-green-700 border border-green-200"
-        }`}>
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-            <div className="mb-4 md:mb-0">
-              <h2 className="font-semibold text-lg">
-                {projectStatus === "in_progress" ? "Project In Progress" : 
-                 projectStatus === "completed_by_designer" ? "Ready for Review" : 
-                 "Project Completed"}
-              </h2>
-              <p>
-                {projectStatus === "in_progress" ? 
-                  (role === "designer" 
-                    ? "You are currently working on this project. Mark it as completed when you're done." 
-                    : "The designer is currently working on your project.") : 
-                 projectStatus === "completed_by_designer" ? 
-                  (role === "client" 
-                    ? "The designer has completed the project. Please review and confirm completion." 
-                    : "You've marked this project as completed. Waiting for client confirmation.") : 
-                  "This project has been completed and signed off by both parties."}
-              </p>
-            </div>
-            
-            {/* Status Actions */}
-            <div>
-              {role === "designer" && projectStatus === "in_progress" && (
-                <button
-                  onClick={handleMarkAsCompletedByDesigner}
-                  disabled={updateLoading}
-                  className={`px-5 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105 ${updateLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {updateLoading ? "Updating..." : "Mark as Completed"}
-                </button>
-              )}
-              
-              {role === "client" && projectStatus === "completed_by_designer" && (
-                <button
-                  onClick={handleMarkAsCompleted}
-                  disabled={updateLoading}
-                  className={`px-5 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105 ${updateLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  {updateLoading ? "Updating..." : "Confirm Completion"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
+        
         {/* Project Details */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Column - Request Details */}
           <div className="md:col-span-2">
             
-            {/* Model Files Section */}
+            {/* HTML Content Section */}
             <div className="bg-white shadow-md rounded-xl overflow-hidden mb-6">
               <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 mb-2">Design Model</h2>
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">HTML Design</h2>
                 <p className="text-gray-600 text-sm">
                   {role === "designer" && projectStatus !== "completed" 
-                    ? "Upload your design file for the client to view." 
-                    : modelFiles.length > 0 
-                    ? "You can view and download the design files below." 
-                    : "No design files have been uploaded yet."}
+                    ? "Upload your HTML design for the client to view." 
+                    : htmlContent 
+                    ? "You can view the HTML design below." 
+                    : "No HTML design has been uploaded yet."}
                 </p>
               </div>
               
               <div className="p-6 bg-gray-50">
-                {role === "designer" && projectStatus !== "completed" ? (
-                  <ModelUploader 
-                    designerId={user.uid} 
-                    projectId={proposalId}
-                    onUploadSuccess={handleModelUploadSuccess}
-                    onUploadError={(err) => setError(err.message)}
-                  />
-                ) : (
-                  <ModelDownloader modelFiles={modelFiles} />
+                {role === "designer" && projectStatus !== "completed" && (
+                  <div className="space-y-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#C19A6B] transition-colors bg-gray-50">
+                      <input
+                        type="file"
+                        id="html-file"
+                        accept=".html,.htm"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          
+                          if (!file.name.toLowerCase().endsWith('.html') && !file.name.toLowerCase().endsWith('.htm')) {
+                            setError('Only .html/.htm files are supported');
+                            return;
+                          }
+                          
+                          const reader = new FileReader();
+                          reader.onload = async (event) => {
+                            const htmlContent = event.target.result;
+                            handleHtmlUploadSuccess({
+                              htmlContent,
+                              fileName: file.name
+                            });
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                      <label
+                        htmlFor="html-file"
+                        className="cursor-pointer flex flex-col items-center justify-center"
+                      >
+                        <FiCode className="text-4xl text-[#C19A6B] mb-3" />
+                        <p className="text-lg font-medium text-gray-700 mb-1">Upload HTML Design</p>
+                        <p className="text-sm text-gray-500 mb-4">Click to browse or drag and drop</p>
+                        <span className="px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors inline-flex items-center">
+                          <FiCode className="mr-2" /> Select HTML File
+                        </span>
+                      </label>
+                    </div>
+                    <button
+                      onClick={handleMarkAsCompletedByDesigner}
+                      className="w-full bg-[#C19A6B] text-white px-4 py-2 rounded-lg hover:bg-[#A0784A] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={updateLoading || !htmlContent || projectStatus === "completed_by_designer"}
+                    >
+                      {updateLoading ? (
+                        <span className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </span>
+                      ) : projectStatus === "completed_by_designer" ? (
+                        <span className="flex items-center justify-center">
+                          <FiCheck className="mr-2" />
+                          Marked as Completed
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center">
+                          <FiCheck className="mr-2" />
+                          Mark as Completed
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
+                
+                {/* HTML content preview */}
+                {htmlContent && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm text-green-600 font-medium">HTML design has been uploaded successfully</p>
+                      {(role === "designer" || projectStatus === "completed") && (
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = htmlFileName || 'design.html';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="px-3 py-1.5 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors inline-flex items-center text-sm"
+                        >
+                          <FiDownload className="mr-1" /> Download HTML
+                        </button>
+                      )}
+                    
+                    </div>
+                    
+                    {/* HTML Preview */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                      <div className="border-b border-gray-200 px-4 py-2 bg-gray-50 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">{htmlFileName || 'design.html'}</span>
+                        <span className="text-xs text-gray-500">HTML Preview</span>
+                      </div>
+                      <div className="h-[400px] overflow-hidden">
+                        <iframe
+                          srcDoc={htmlContent}
+                          title="HTML Design Preview"
+                          className="w-full h-full border-none"
+                          sandbox="allow-scripts"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* For client to mark project as completed */}
+                {role === "client" && projectStatus === "completed_by_designer" && (
+                  <div className="mt-6">
+                    <button
+                      onClick={handleMarkAsCompleted}
+                      className="w-full bg-[#C19A6B] text-white px-4 py-2 rounded-lg hover:bg-[#A0784A] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={updateLoading}
+                    >
+                      {updateLoading ? (
+                        <span className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center">
+                          <FiCheck className="mr-2" />
+                          Mark Project as Completed
+                        </span>
+                      )}
+                    </button>
+                    <p className="text-sm text-gray-500 mt-2">
+                      By marking this project as completed, you confirm that the design meets your requirements and the designer will receive payment.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -547,6 +672,28 @@ function ProjectPage() {
                 {request && (
                   <div className="mb-6 pb-6 border-b border-gray-100">
                     <h3 className="font-medium text-gray-900 mb-3">Request Information</h3>
+                     {/* Reference Image Display */}
+                  {request.referenceImageUrl && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Reference Image</h4>
+                      <div className="relative w-full h-48 rounded-md overflow-hidden border border-gray-300 cursor-pointer">
+                        <img
+                          src={request.referenceImageUrl}
+                          alt="Reference Image"
+                          className="w-full h-full object-contain"
+                          onClick={() => setZoomImage(request.referenceImageUrl)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Image Zoom Modal */}
+                  {zoomImage && (
+                    <ImageZoomModal 
+                      imageUrl={zoomImage} 
+                      onClose={() => setZoomImage(null)} 
+                    />
+                  )}
                     <p className="text-gray-600 mb-4">{request.description}</p>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="bg-gray-50 p-3 rounded-lg">
@@ -682,26 +829,17 @@ function ProjectPage() {
                     <span>Message {role === "client" ? "Designer" : "Client"}</span>
                   </button>
                   
-                  <button
-                    onClick={() => navigate(`/projects?proposalId=${proposalId}`)}
-                    className="w-full px-5 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
-                  >
-                    <FiSettings />
-                    <span>Project Panel</span>
-                  </button>
-                  
-                  {role === "designer" && projectStatus === "in_progress" && (
+                  {role === "designer" && (
                     <button
-                      onClick={handleMarkAsCompletedByDesigner}
-                      className="w-full px-5 py-3 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105 flex items-center justify-center gap-2"
-                      disabled={updateLoading}
+                      onClick={() => navigate(`/projects?proposalId=${proposalId}`)}
+                      className="w-full px-5 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
                     >
-                      <FiCheck />
-                      <span>
-                        {updateLoading ? "Processing..." : "Mark as Completed"}
-                      </span>
+                      <FiSettings />
+                      <span>Project Panel</span>
                     </button>
                   )}
+                  
+                 
                   
                   {role === "client" && projectStatus === "completed_by_designer" && (
                     <button
@@ -723,6 +861,8 @@ function ProjectPage() {
       </div>
     </div>
   );
+  
 }
 
 export default ProjectPage;
+

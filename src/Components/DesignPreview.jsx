@@ -137,19 +137,12 @@ export default function DesignPreview() {
 
       {/* Action Buttons */}
       <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <div className="max-w-7xl mx-auto flex justify-center items-center">
           <button
             onClick={() => navigate(-1)}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
           >
             Back
-          </button>
-          <button
-            onClick={handleApproveDesign}
-            disabled={isApproving || designData?.status === 'approved'}
-            className={`px-6 py-2 rounded-lg transition-colors ${isApproving ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#C19A6B] hover:bg-[#A0784A] text-white'}`}
-          >
-            {isApproving ? 'Approving...' : designData?.status === 'approved' ? 'Already Approved' : 'Approve & Download'}
           </button>
         </div>
       </div>

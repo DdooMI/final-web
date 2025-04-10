@@ -21,12 +21,11 @@ import MessageDetailPage from "./Pages/MessageDetailPage";
 import ClientRequestPage from "./Desgin pages/ClientRequestPage";
 import ClientRequestsPage from "./Desgin pages/ClientRequestsPage";
 import ClientDesignersPage from "./Desgin pages/ClientDesignersPage";
-
 import DesignerRequestsPage from "./Desgin pages/DesignerRequestsPage";
 import DesignerProposalsPage from "./Desgin pages/DesignerProposalsPage";
-
 import DesignerPortfolioPage from "./Desgin pages/DesignerPortfolioPage";
 import PaymentPage from "./Pages/PaymentPage";
+import DesignPreview from "./Components/DesignPreview";
 
 function App() {
   const location = useLocation();
@@ -39,6 +38,7 @@ function App() {
     location.pathname === "/payment" ||
     location.pathname.startsWith("/project/") ||
     location.pathname.startsWith("/messages/") ||
+    location.pathname.startsWith("/design-preview/") ||
     location.pathname === "/client-request";
 
   return (
@@ -61,6 +61,7 @@ function App() {
         <Route path="/notifications/:id" element={<NotificationDetailPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/messages/:conversationId" element={<MessageDetailPage />} />
+        <Route path="/payment" element={<PaymentPage />} />
 
         {/* Design Routes */}
         <Route path="/client-request" element={<ClientRequestPage />} />
@@ -68,13 +69,15 @@ function App() {
         <Route path="/client-designers" element={<ClientDesignersPage />} />
         <Route path="/designer-requests" element={<DesignerRequestsPage />} />
         <Route path="/designer-proposals" element={<DesignerProposalsPage />} />
-   
         <Route
           path="/designer-portfolio/:designerId"
           element={<DesignerPortfolioPage />}
         />
+        <Route
+          path="/design-preview/:proposalId"
+          element={<DesignPreview />}
+        />
 
-        <Route path="/payment" element={<PaymentPage />} />
       </Routes>
 
       {!hideNavFooter && <Footer />}

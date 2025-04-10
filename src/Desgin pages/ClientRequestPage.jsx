@@ -7,6 +7,7 @@ import { db } from "../firebase/firebaseConfig";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import axiosApi from "../axios/axiosConfig";
 
 // Form validation schema
 const requestSchema = z.object({
@@ -16,6 +17,7 @@ const requestSchema = z.object({
   duration: z.string().refine(val => !isNaN(Number(val)) && Number(val) > 0 && Number(val) <= 365, "Duration must be between 1 and 365 days"),
   roomType: z.string(),
   additionalDetails: z.string().optional(),
+  // We don't need to validate the image in the schema as it's handled separately
 });
 
 function ClientRequestPage() {
@@ -26,6 +28,9 @@ function ClientRequestPage() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [insufficientBalance, setInsufficientBalance] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [fileName, setFileName] = useState("Choose a reference image");
+  const [imagePreview, setImagePreview] = useState(null);
   
   // Fetch user balance when component mounts
   useEffect(() => {
@@ -46,6 +51,21 @@ function ClientRequestPage() {
     }
   });
 
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    setImageFile(file);
+    setFileName(file.name);
+    
+    // Create preview URL for the selected image
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setError(null);
@@ -60,6 +80,19 @@ function ClientRequestPage() {
     }
 
     try {
+      // Upload image to Cloudinary if an image was selected
+      let referenceImageUrl = "";
+      
+      if (imageFile) {
+        const imageData = new FormData();
+        imageData.append("file", imageFile);
+        imageData.append("upload_preset", "home_customization");
+        imageData.append("cloud_name", "dckwbkqjv");
+
+        const res = await axiosApi.post("", imageData);
+        referenceImageUrl = res.data.secure_url;
+      }
+
       // Add the request to Firestore
       await addDoc(collection(db, "designRequests"), {
         userId: user.uid,
@@ -70,13 +103,17 @@ function ClientRequestPage() {
         duration: data.duration,
         roomType: data.roomType,
         additionalDetails: data.additionalDetails || "",
+        referenceImageUrl: referenceImageUrl, // Add the image URL to the document
         status: "pending",
         createdAt: serverTimestamp(),
       });
 
       setSubmitSuccess(true);
-      // Reset form
+      // Reset form and image states
       reset();
+      setImageFile(null);
+      setFileName("Choose a reference image");
+      setImagePreview(null);
 
       // Reset success message after 3 seconds and navigate to requests page
       setTimeout(() => {
@@ -263,6 +300,60 @@ function ClientRequestPage() {
                 placeholder="Add any other important details, preferences, or special requirements for your project"
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#C19A6B] focus:border-[#C19A6B]"
               ></textarea>
+            </div>
+            
+            <div>
+              <label
+                htmlFor="referenceImage"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Reference Image
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Upload an image that shows your style preferences or inspiration for the design
+              </p>
+              
+              <div className="mt-1 flex items-center">
+                <label
+                  htmlFor="referenceImage"
+                  className="cursor-pointer px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C19A6B]"
+                >
+                  {fileName}
+                </label>
+                <input
+                  id="referenceImage"
+                  name="referenceImage"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleFileChange}
+                />
+              </div>
+              
+              {imagePreview && (
+                <div className="mt-3">
+                  <div className="relative w-40 h-40 rounded-md overflow-hidden border border-gray-300">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setFileName("Choose a reference image");
+                        setImagePreview(null);
+                        // Reset the file input value to allow re-uploading the same file
+                        document.getElementById('referenceImage').value = '';
+                      }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">

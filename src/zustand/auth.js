@@ -112,7 +112,7 @@ export const useAuth = create((set, get) => ({
         errorMessage =
           "Email/password accounts are not enabled. Please contact support";
       } else if (err.code === "auth/weak-password") {
-        errorMessage = "Password is too weak. Please use a stronger password";
+        errorMessage = "Password must be at least 6 characters long and contain a mix of letters, numbers, and special characters";
       }
 
       set({ error: errorMessage });

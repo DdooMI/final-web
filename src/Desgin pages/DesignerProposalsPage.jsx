@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   collection,
@@ -9,22 +9,21 @@ import {
   where,
   doc,
   getDoc,
-  updateDoc,
+ 
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
-import { createNotification } from "../firebase/notifications";
+
 import { formatDistanceToNow } from "date-fns";
 
 function DesignerProposalsPage() {
   const { user, role } = useAuth();
+  const location = useLocation();
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [requestDetails, setRequestDetails] = useState({});
   const [activeFilter, setActiveFilter] = useState("all");
-  const [updateLoading, setUpdateLoading] = useState(false);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
   const [clientNames, setClientNames] = useState({});
 
   useEffect(() => {
@@ -50,6 +49,18 @@ function DesignerProposalsPage() {
         });
 
         setProposals(proposalsData);
+
+        // Check if there's a proposalId in the URL query params
+        const urlParams = new URLSearchParams(location.search);
+        const proposalId = urlParams.get('proposalId');
+        
+        if (proposalId) {
+          // Find the proposal with the matching ID
+          const proposalToSelect = proposalsData.find(prop => prop.id === proposalId);
+          if (proposalToSelect) {
+            setSelectedProposal(proposalToSelect);
+          }
+        }
 
         // Get request details for each proposal
         const requestDetailsData = {};
@@ -123,321 +134,7 @@ function DesignerProposalsPage() {
       ? proposals
       : proposals.filter((proposal) => proposal.status === activeFilter);
 
-  // Handle marking proposal as completed
-  const handleMarkAsCompleted = async (proposalId) => {
-    if (!proposalId) return;
 
-    setUpdateLoading(true);
-    setError(null);
-
-    try {
-      const proposalRef = doc(db, "designProposals", proposalId);
-      const proposalSnap = await getDoc(proposalRef);
-      
-      if (!proposalSnap.exists()) {
-        throw new Error("Proposal not found");
-      }
-      
-      const proposalData = proposalSnap.data();
-      
-      // Get the HTML content from localStorage
-      const designState = localStorage.getItem('homeDesign');
-      if (!designState) {
-        throw new Error("No design data found");
-      }
-
-      // Create HTML content
-      const sceneData = JSON.parse(designState);
-      const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Interior Design Scene</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <style>
-        body { margin: 0; }
-        canvas { width: 100%; height: 100vh; }
-        #loading { 
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%);
-            font-family: Arial, sans-serif;
-            font-size: 18px;
-            color: #333;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        #error-message {
-            color: #ff4444;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
-    <div id="loading">Loading 3D Models...<div id="error-message"></div></div>
-    <script>
-        const sceneData = ${JSON.stringify(sceneData, null, 2)};
-
-        // Initialize Three.js scene
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf5f5f5);
-
-        // Set up camera
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(20, 20, 20);
-        camera.lookAt(0, 0, 0);
-
-        // Set up renderer with shadows
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
-
-        // Add OrbitControls with better defaults
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.minDistance = 5;
-        controls.maxDistance = 50;
-        controls.maxPolarAngle = Math.PI / 2;
-
-        // Enhanced lighting setup
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(15, 15, 15);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
-        directionalLight.shadow.camera.near = 0.5;
-        directionalLight.shadow.camera.far = 50;
-        directionalLight.shadow.bias = -0.0001;
-        scene.add(directionalLight);
-
-        // Add Grid Helper with better visibility
-        const size = 30;
-        const divisions = 30;
-        const gridHelper = new THREE.GridHelper(size, divisions, 0x888888, 0xcccccc);
-        gridHelper.material.opacity = 0.5;
-        gridHelper.material.transparent = true;
-        scene.add(gridHelper);
-
-        // Update loading status function
-        const updateLoadingStatus = (message, isError = false) => {
-            const loadingElement = document.getElementById('loading');
-            const errorElement = document.getElementById('error-message');
-            if (loadingElement) {
-                if (isError) {
-                    errorElement.textContent = message;
-                } else {
-                    loadingElement.firstChild.textContent = message;
-                    errorElement.textContent = '';
-                }
-            }
-        };
-
-        // Load and render scene data
-        async function loadScene() {
-            const loader = new THREE.GLTFLoader();
-            loader.crossOrigin = 'anonymous';
-
-            const modelPaths = {
-                'sofa': 'https://raw.githubusercontent.com/DdooMI/models/main/sofa.glb',
-                'chair': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb',
-                'bed': 'https://raw.githubusercontent.com/DdooMI/models/main/bed.glb',
-                'ikea_idanas_single_bed': 'https://raw.githubusercontent.com/DdooMI/models/main/ikea_idanas_single_bed.glb',
-                'furniture': 'https://raw.githubusercontent.com/DdooMI/models/main/chair.glb'
-            };
-            
-            let loadedModels = 0;
-            const totalModels = sceneData.objects.length;
-            
-            updateLoadingStatus('Initializing scene and loading models...');
-
-            // Load walls with enhanced materials
-            sceneData.walls.forEach(wall => {
-                const length = Math.sqrt(
-                    Math.pow(wall.end.x - wall.start.x, 2) + Math.pow(wall.end.z - wall.start.z, 2)
-                );
-                const angle = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
-                
-                const geometry = new THREE.BoxGeometry(length, 3, 0.2);
-                const material = new THREE.MeshStandardMaterial({
-                    color: wall.color || 0xcccccc,
-                    roughness: 0.8,
-                    metalness: 0.2,
-                    envMapIntensity: 1
-                });
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                mesh.position.set(
-                    (wall.start.x + wall.end.x) / 2,
-                    1.5,
-                    (wall.start.z + wall.end.z) / 2
-                );
-                mesh.rotation.y = angle;
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                scene.add(mesh);
-            });
-
-            // Load floors with enhanced materials
-            sceneData.floors.forEach(floor => {
-                const geometry = new THREE.PlaneGeometry(floor.size, floor.length || floor.size);
-                const material = new THREE.MeshStandardMaterial({
-                    color: floor.color || 0xeeeeee,
-                    side: THREE.DoubleSide,
-                    roughness: 0.8,
-                    metalness: 0.2,
-                    envMapIntensity: 1
-                });
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                mesh.position.set(floor.position.x, 0.01, floor.position.z);
-                mesh.rotation.x = -Math.PI / 2;
-                mesh.receiveShadow = true;
-                scene.add(mesh);
-            });
-
-            // Load 3D models for furniture with enhanced error handling
-            for (const obj of sceneData.objects) {
-                try {
-                    if (!modelPaths[obj.type]) {
-                        console.warn('Unknown model type: ' + obj.type + '. Using chair as fallback.');
-                        updateLoadingStatus('Unknown model type: ' + obj.type + '. Using chair as fallback.', false);
-                    }
-                    
-                    const modelPath = modelPaths[obj.type] || modelPaths['chair'];
-                    updateLoadingStatus('Loading model ' + (loadedModels + 1) + '/' + totalModels + ': ' + obj.type);
-                    
-                    const gltf = await loader.loadAsync(modelPath);
-                    const model = gltf.scene;
-                    loadedModels++;
-                    updateLoadingStatus('Successfully loaded ' + loadedModels + '/' + totalModels + ' models');
-
-                    model.position.set(obj.position.x, obj.position.y || 0, obj.position.z);
-                    if (obj.rotation) {
-                        model.rotation.set(0, obj.rotation, 0);
-                    }
-                    if (obj.scale) {
-                        const scale = typeof obj.scale === 'number' ? obj.scale : 1;
-                        model.scale.set(scale, scale, scale);
-                    }
-
-                    model.traverse((child) => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                            if (obj.color) {
-                                child.material.color.setHex(obj.color.replace('#', '0x'));
-                            }
-                            child.material.roughness = 0.7;
-                            child.material.metalness = 0.3;
-                            child.material.envMapIntensity = 1;
-                        }
-                    });
-
-                    scene.add(model);
-                } catch (error) {
-                    console.error('Error loading model ' + obj.type + ':', error);
-                    updateLoadingStatus('Error loading model ' + obj.type + '. Please check the model path and try again.', true);
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-            }
-
-            if (loadedModels > 0) {
-                document.getElementById('loading').style.display = 'none';
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
-
-        loadScene().then(() => {
-            animate();
-        }).catch(error => {
-            console.error('Scene initialization error:', error);
-            updateLoadingStatus('Failed to initialize scene. Please refresh the page.', true);
-        });
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-        }
-
-        window.addEventListener('resize', onWindowResize, false);
-    </script>
-</body>
-</html>`;
-
-      // Update proposal with completed status and HTML content
-      await updateDoc(proposalRef, {
-        status: "completed",
-        htmlContent: htmlContent
-      });
-
-      // Update the request status to completed
-      if (proposalData.requestId) {
-        const requestRef = doc(db, "designRequests", proposalData.requestId);
-        await updateDoc(requestRef, {
-          status: "completed"
-        });
-      }
-
-      // Create notification for client
-      if (proposalData.clientId) {
-        await createNotification({
-          userId: proposalData.clientId,
-          title: "Proposal Completed",
-          message: `The designer has marked their proposal as completed. Please review the final design.`,
-          type: "success",
-          relatedId: proposalId,
-        });
-      }
-
-      // Update local state
-      setProposals((prevProposals) =>
-        prevProposals.map((p) =>
-          p.id === proposalId ? { ...p, status: "completed" } : p
-        )
-      );
-
-      if (selectedProposal?.id === proposalId) {
-        setSelectedProposal((prev) => ({ ...prev, status: "completed" }));
-      }
-
-      // Update request details local state
-      if (proposalData.requestId && requestDetails[proposalData.requestId]) {
-        setRequestDetails(prev => ({
-          ...prev,
-          [proposalData.requestId]: {
-            ...prev[proposalData.requestId],
-            status: "completed"
-          }
-        }));
-      }
-
-      setUpdateSuccess(true);
-      setTimeout(() => setUpdateSuccess(false), 3000);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdateLoading(false);
-    }
-  };
 
 
   return (
@@ -506,20 +203,7 @@ function DesignerProposalsPage() {
           </div>
         </div>
 
-        {updateSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 relative"
-            role="alert"
-          >
-            <strong className="font-bold">Success!</strong>
-            <span className="block sm:inline">
-              {" "}
-              Proposal status updated successfully.
-            </span>
-          </motion.div>
-        )}
+
 
         {error && (
           <motion.div
@@ -695,39 +379,7 @@ function DesignerProposalsPage() {
                       >
                         View Project Page
                       </button>
-                      <button
-                        className="px-3 py-1.5 bg-[#C19A6B] text-white rounded hover:bg-[#A0784A] transition"
-                        onClick={() => handleMarkAsCompleted(selectedProposal.id)}
-                        disabled={updateLoading}
-                      >
-                        {updateLoading ? (
-                          <span className="flex items-center">
-                            <svg
-                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                            Updating...
-                          </span>
-                        ) : (
-                          "Mark as Completed"
-                        )}
-                      </button>
+                     
                     </>
                   )}
                 </div>

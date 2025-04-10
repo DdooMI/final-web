@@ -33,7 +33,7 @@ const UserBalance = () => {
           <div>
             <p className="text-gray-600 text-sm">Available Balance</p>
             <p className="text-2xl font-bold">
-              ${isLoading ? "..." : balance.toFixed(2)}
+              ${isLoading ? "..." : (balance || 0).toFixed(2)}
             </p>
           </div>
         </div>

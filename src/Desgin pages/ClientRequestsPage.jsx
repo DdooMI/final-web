@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import {
   collection,
   getDocs,
@@ -15,9 +15,11 @@ import { FiMessageSquare, FiCheck, FiX, FiEye } from "react-icons/fi";
 
 import { db } from "../firebase/firebaseConfig";
 import { createNotification } from "../firebase/notifications";
+import ImageZoomModal from "../Components/ImageZoomModal";
 
 function ClientRequestsPage() {
   const { user, role } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [proposals, setProposals] = useState({});
   const [loading, setLoading] = useState(true);
@@ -25,6 +27,7 @@ function ClientRequestsPage() {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [zoomImage, setZoomImage] = useState(null);
   
   // Handle updating proposal status (accept/reject)
   const handleUpdateProposalStatus = async (proposalId, newStatus) => {
@@ -390,6 +393,29 @@ function ClientRequestsPage() {
                         {selectedRequest.additionalDetails}
                       </p>
                     </div>
+                  )}
+                  
+                  {/* Reference Image Display */}
+                  {selectedRequest.referenceImageUrl && (
+                    <div className="mt-4">
+                      <span className="text-gray-500">Reference Image:</span>
+                      <div className="mt-2 relative w-full h-48 rounded-md overflow-hidden border border-gray-300 cursor-pointer">
+                        <img
+                          src={selectedRequest.referenceImageUrl}
+                          alt="Reference Image"
+                          className="w-full h-full object-contain"
+                          onClick={() => setZoomImage(selectedRequest.referenceImageUrl)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Image Zoom Modal */}
+                  {zoomImage && (
+                    <ImageZoomModal 
+                      imageUrl={zoomImage} 
+                      onClose={() => setZoomImage(null)} 
+                    />
                   )}
                 </div>
 

@@ -15,6 +15,7 @@ import {
 import { db } from "../firebase/firebaseConfig";
 import { formatDistanceToNow } from "date-fns";
 import { createNotification } from "../firebase/notifications";
+import ImageZoomModal from "../Components/ImageZoomModal";
 
 function DesignerRequestsPage() {
   const { user, role } = useAuth();
@@ -30,6 +31,7 @@ function DesignerRequestsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [hasProposed, setHasProposed] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null);
 
   useEffect(() => {
     if (selectedRequest) {
@@ -272,6 +274,29 @@ function DesignerRequestsPage() {
                       {selectedRequest.userEmail}
                     </div>
                   </div>
+                  
+                  {/* Reference Image Display */}
+                  {selectedRequest.referenceImageUrl && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Reference Image</h4>
+                      <div className="relative w-full h-48 rounded-md overflow-hidden border border-gray-300 cursor-pointer">
+                        <img
+                          src={selectedRequest.referenceImageUrl}
+                          alt="Reference Image"
+                          className="w-full h-full object-contain"
+                          onClick={() => setZoomImage(selectedRequest.referenceImageUrl)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Image Zoom Modal */}
+                  {zoomImage && (
+                    <ImageZoomModal 
+                      imageUrl={zoomImage} 
+                      onClose={() => setZoomImage(null)} 
+                    />
+                  )}
                 </div>
 
                 {hasProposed ? (
