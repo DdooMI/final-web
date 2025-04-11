@@ -49,7 +49,11 @@ export const useAuth = create((set, get) => ({
           error: null,
         });
 
-        navigation("/");
+        if (userData.role === 'admin') {
+          navigation('/dashboard');
+        } else {
+          navigation('/');
+        }
       } else {
         throw new Error("User role not found.");
       }

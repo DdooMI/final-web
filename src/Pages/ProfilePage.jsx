@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
-import axiosApi from "../axios/axiosConfig";
+import {axiosApi} from "../axios/axiosConfig";
 import UserBalance from "../payment/user-balance";
 
 export default function ProfilePage() {

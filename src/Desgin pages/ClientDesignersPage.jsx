@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
 import { Navigate, useNavigate } from "react-router-dom";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDoc, getDocs, query, where, doc } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 
 function ClientDesignersPage() {
@@ -26,12 +26,12 @@ function ClientDesignersPage() {
           const designerData = docRef.data();
 
           // Get designer's profile info
-          const profileRef = collection(db, "users", docRef.id, "profile");
-          const profileSnap = await getDocs(profileRef);
+          const profileRef = doc(db, "users", docRef.id, "profile", "profileInfo");
+          const profileSnap = await getDoc(profileRef);
           let profileData = { name: "Designer", photoURL: "" };
 
-          if (!profileSnap.empty) {
-            profileData = profileSnap.docs[0].data();
+          if (profileSnap.exists()) {
+            profileData = profileSnap.data();
           }
 
           designersData.push({

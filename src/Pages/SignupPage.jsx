@@ -15,6 +15,7 @@ import {
   FaHome,
 } from "react-icons/fa";
 import { useState } from "react";
+import { createSignupNotification } from "../firebase/signupNotification";
 
 const schema = z
   .object({
@@ -55,6 +56,9 @@ function Signup() {
     try {
       console.log(data);
       await signUp(data, navigate);
+      
+      // Create notification for admin users about the new signup
+      await createSignupNotification(data);
     } catch (error) {
       console.error(error);
     } finally {

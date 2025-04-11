@@ -7,7 +7,7 @@ import { db } from "../firebase/firebaseConfig";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axiosApi from "../axios/axiosConfig";
+import {axiosApi} from "../axios/axiosConfig";
 
 // Form validation schema
 const requestSchema = z.object({
