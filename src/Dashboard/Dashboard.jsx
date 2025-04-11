@@ -2,7 +2,7 @@ import { ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/solid";
 import { ChartBarIcon, UserGroupIcon, UserIcon, ChatBubbleLeftRightIcon, StarIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
-import { designersData } from '../data/designersData';
+
 
 // Client profiles with ratings
 const clients = [
@@ -133,7 +133,7 @@ export default function Dashboard() {
     .slice(0, 4);
 
   // Filter designers based on selected filter
-  const filteredDesigners = [...designersData]
+  const filteredDesigners = [...[]]
     .sort((a, b) => {
       if (designerFilter === "top-rated") {
         return b.rating - a.rating;

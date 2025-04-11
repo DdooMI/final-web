@@ -1,32 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../zustand/auth";
-import { useBalance } from "../zustand/balance";
+/* eslint-disable no-unused-vars */
+import { formatDistanceToNow } from "date-fns";
 import {
+  collection,
   doc,
   getDoc,
-  updateDoc,
-  collection,
-  addDoc,
-  serverTimestamp,
-  query,
-  where,
   getDocs,
+  runTransaction,
+  serverTimestamp,
+  updateDoc
 } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { FiCheck, FiCode, FiDollarSign, FiDownload, FiMessageSquare, FiSettings } from "react-icons/fi";
+import { useNavigate, useParams } from "react-router-dom";
+import DesignerRating from "../Components/DesignerRating";
+import ErrorBoundary from "../Components/ErrorBoundary";
+import ImageZoomModal from "../Components/ImageZoomModal";
 import { db } from "../firebase/firebaseConfig";
 import { createNotification } from "../firebase/notifications";
-import { runTransaction } from "firebase/firestore";
-import { FiMessageSquare, FiCheck, FiX, FiSettings, FiDownload, FiUpload, FiDollarSign, FiCode } from "react-icons/fi";
-import { formatDistanceToNow } from "date-fns";
-import DesignerRating from "../Components/DesignerRating";
-import ImageZoomModal from "../Components/ImageZoomModal";
+import { useAuth } from "../zustand/auth";
+import { useBalance } from "../zustand/balance";
 
 function ProjectPage() {
   const { proposalId } = useParams();
   const { user, role } = useAuth();
   const { balance, fetchBalance } = useBalance();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [proposal, setProposal] = useState(null);
@@ -69,7 +68,10 @@ function ProjectPage() {
           ...proposalData,
           createdAt: proposalData.createdAt
             ? formatDistanceToNow(proposalData.createdAt.toDate(), { addSuffix: true })
-            : "Unknown date"
+            : "Unknown date",
+          htmlUpdatedAt: proposalData.htmlUpdatedAt
+            ? formatDistanceToNow(proposalData.htmlUpdatedAt.toDate(), { addSuffix: true })
+            : "Not updated yet"
         };
         setProposal(processedProposal);
 
@@ -97,16 +99,16 @@ function ProjectPage() {
 
           if (designerSnap.exists()) {
             const designerData = designerSnap.data();
-            
+
             // Get designer profile
             const profileRef = collection(db, "users", proposalData.designerId, "profile");
             const profileSnap = await getDocs(profileRef);
             let designerProfile = {};
-            
+
             if (!profileSnap.empty) {
               designerProfile = profileSnap.docs[0].data();
             }
-            
+
             setDesigner({
               id: designerSnap.id,
               ...designerData,
@@ -122,16 +124,16 @@ function ProjectPage() {
 
           if (clientSnap.exists()) {
             const clientData = clientSnap.data();
-            
+
             // Get client profile
             const profileRef = collection(db, "users", proposalData.clientId, "profile");
             const profileSnap = await getDocs(profileRef);
             let clientProfile = {};
-            
+
             if (!profileSnap.empty) {
               clientProfile = profileSnap.docs[0].data();
             }
-            
+
             setClient({
               id: clientSnap.id,
               ...clientData,
@@ -144,7 +146,7 @@ function ProjectPage() {
         if (proposalData.projectStatus) {
           setProjectStatus(proposalData.projectStatus);
         }
-        
+
         // Get HTML content if any
         if (proposalData.htmlContent) {
           setHtmlContent(proposalData.htmlContent);
@@ -164,10 +166,10 @@ function ProjectPage() {
   // Handle marking project as completed by designer
   const handleMarkAsCompletedByDesigner = async () => {
     if (!proposal) return;
-    
+
     setUpdateLoading(true);
     setError(null);
-    
+
     try {
       // Validate HTML content exists
       const proposalSnap = await getDoc(doc(db, "designProposals", proposalId));
@@ -178,24 +180,31 @@ function ProjectPage() {
       }
 
       const proposalRef = doc(db, "designProposals", proposalId);
-      
+
       // Update proposal status
       await updateDoc(proposalRef, {
         projectStatus: "completed_by_designer",
         htmlUpdatedAt: serverTimestamp()
       });
-      
+
       // Refresh proposal data
       const updatedProposal = await getDoc(proposalRef);
       if (updatedProposal.exists()) {
         const updatedData = updatedProposal.data();
-        
+
+        const processedData = {
+          ...updatedData,
+          htmlUpdatedAt: updatedData.htmlUpdatedAt
+            ? formatDistanceToNow(updatedData.htmlUpdatedAt.toDate(), { addSuffix: true })
+            : "Recently"
+        };
+
         setProposal(prev => ({
           ...prev,
-          ...updatedData
+          ...processedData
         }));
       }
-      
+
       // Create notification for client
       await createNotification({
         userId: proposal?.clientId,
@@ -204,10 +213,10 @@ function ProjectPage() {
         type: "success",
         relatedId: proposalId,
       });
-      
+
       // Update local state
       setProjectStatus("completed_by_designer");
-      
+
       setUpdateSuccess(true);
       setTimeout(() => {
         setUpdateSuccess(false);
@@ -223,19 +232,19 @@ function ProjectPage() {
   // Handle marking project as completed by client
   const handleMarkAsCompleted = async () => {
     if (!proposal) return;
-    
+
     setUpdateLoading(true);
     setError(null);
-    
+
     try {
       const proposalRef = doc(db, "designProposals", proposalId);
-      
+
       // Update proposal status
       await updateDoc(proposalRef, {
         projectStatus: "completed",
         status: "completed",
       });
-      
+
       // Update the request status to completed
       if (proposal.requestId) {
         const requestRef = doc(db, "designRequests", proposal.requestId);
@@ -243,33 +252,33 @@ function ProjectPage() {
           status: "completed"
         });
       }
-      
+
       // Transfer funds from client to designer
       if (proposal.price) {
         try {
           const clientRef = doc(db, 'users', proposal.clientId);
           const designerRef = doc(db, 'users', proposal.designerId);
-          
+
           await runTransaction(db, async (transaction) => {
             const clientDoc = await transaction.get(clientRef);
             const designerDoc = await transaction.get(designerRef);
-            
+
             if (!clientDoc.exists() || !designerDoc.exists()) {
               throw new Error('User documents not found');
             }
-            
+
             const clientBalance = clientDoc.data().balance || 0;
             const transferAmount = parseFloat(proposal.price);
-            
+
             if (clientBalance < transferAmount) {
               throw new Error('Client has insufficient balance for transfer');
             }
-            
+
             // Update client balance
             transaction.update(clientRef, {
               balance: clientBalance - transferAmount
             });
-            
+
             // Update designer balance
             const designerBalance = designerDoc.data().balance || 0;
             transaction.update(designerRef, {
@@ -277,7 +286,7 @@ function ProjectPage() {
             });
           });
           setTransferSuccess(true);
-          
+
           // Refresh client's balance
           if (role === 'client' && user && user.uid) {
             fetchBalance(user.uid);
@@ -288,7 +297,7 @@ function ProjectPage() {
           // We'll handle this separately
         }
       }
-      
+
       // Create notification for designer
       await createNotification({
         userId: proposal?.designerId,
@@ -297,13 +306,13 @@ function ProjectPage() {
         type: "success",
         relatedId: proposal.id,
       });
-      
+
       // Update local state
       setProjectStatus("completed");
-      
+
       // Show rating form
       setShowRatingForm(true);
-      
+
       setUpdateSuccess(true);
       setTimeout(() => {
         setUpdateSuccess(false);
@@ -315,7 +324,7 @@ function ProjectPage() {
       setUpdateLoading(false);
     }
   };
-  
+
   // Handle HTML upload success
   const handleHtmlUploadSuccess = async (fileInfo) => {
     // Validate required fields
@@ -331,7 +340,7 @@ function ProjectPage() {
 
       // Update Firestore document
       const proposalRef = doc(db, "designProposals", proposalId);
-      await updateDoc(proposalRef, { 
+      await updateDoc(proposalRef, {
         htmlContent: fileInfo.htmlContent,
         htmlFileName: fileInfo.fileName || 'design.html',
         htmlUpdatedAt: serverTimestamp()
@@ -345,6 +354,7 @@ function ProjectPage() {
       setError(err.message || 'Failed to save HTML content');
     }
   }
+ 
   // Handle rating submission
   const handleRatingSubmit = (ratingData) => {
     // Hide the rating form after submission
@@ -355,20 +365,25 @@ function ProjectPage() {
   const startConversation = async () => {
     try {
       // Import needed only when the function is called
-      const { sendMessage } = await import("../firebase/messages");
-      
+      const { sendMessage, findExistingConversation } = await import("../firebase/messages");
+
       // Determine sender and receiver based on user role
       const senderId = user.uid;
       const receiverId = role === "client" ? proposal.designerId : proposal.clientId;
-      
-      // Start a new conversation
-      const conversationId = await sendMessage({
-        senderId,
-        receiverId,
-        content: `Hello, I'm messaging about the project "${request?.title || 'Design Project'}".`,
-      });
-      
-      // Navigate to the conversation
+
+      // Check if there's an existing conversation between these users
+      let conversationId = await findExistingConversation(senderId, receiverId);
+
+      // If no existing conversation, create a new one with greeting message
+      if (!conversationId) {
+        conversationId = await sendMessage({
+          senderId,
+          receiverId,
+          content: `Hello, I'm messaging about the project "${request?.title || 'Design Project'}".`,
+        });
+      }
+
+      // Navigate to the conversation without sending duplicate message
       navigate(`/messages/${conversationId}`);
     } catch (error) {
       console.error("Error starting conversation:", error);
@@ -406,7 +421,7 @@ function ProjectPage() {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="max-w-md w-full bg-white shadow-lg rounded-xl p-8 text-center">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Project Not Found</h2>
-          <p className="text-gray-700 mb-6">The project you're looking for doesn't exist or you don't have permission to view it.</p>
+          <p className="text-gray-700 mb-6">The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
           <button
             onClick={() => navigate(-1)}
             className="px-5 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105"
@@ -444,6 +459,36 @@ function ProjectPage() {
         return "Unknown Status";
     }
   }
+  // Function to safely format timestamp with error handling
+  const formatTimestamp = (timestamp) => {
+    try {
+      if (typeof timestamp === 'string') {
+        return timestamp;
+      } else if (timestamp?.toDate) {
+        // Handle Firestore Timestamp
+        const updatedDate = timestamp.toDate();
+        return updatedDate.toLocaleString();
+      } else if (timestamp?.seconds) {
+        // Fallback for raw timestamp
+        const updatedDate = new Date(timestamp.seconds * 1000);
+        return updatedDate.toLocaleString();
+      } else {
+        return "recently";
+      }
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return "recently";
+    }
+  };
+
+  let lastUpdatedText = "No HTML design has been uploaded yet.";
+  if (htmlContent) {
+    if (proposal?.htmlUpdatedAt) {
+      lastUpdatedText = `You can view the HTML design below (last updated ${formatTimestamp(proposal.htmlUpdatedAt)})`;
+    } else {
+      lastUpdatedText = "You can view the HTML design below.";
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-10 px-4 sm:px-6 lg:px-8">
@@ -451,25 +496,27 @@ function ProjectPage() {
         {/* Header with navigation */}
         <div className="mb-6 bg-white shadow-md rounded-xl p-6 flex flex-col md:flex-row md:justify-between md:items-center">
           <div className="mb-4 md:mb-0">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {request?.title || "Design Project"}
-            </h1>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(projectStatus)}`}>
-                {getStatusLabel(projectStatus)}
-              </span>
-              <p className="text-gray-600">
-                {role === "client" ? "Designer: " : "Client: "}
-                <span className="font-medium">
-                  {role === "client" ? designer?.name || designer?.email : client?.name || client?.email}
+            <ErrorBoundary fallback="Project Information">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {request?.title || "Design Project"}
+              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(projectStatus)}`}>
+                  {getStatusLabel(projectStatus)}
                 </span>
-              </p>
-            </div>
-            {transferSuccess && (
-              <p className="text-green-600 mt-2 flex items-center">
-                <FiDollarSign className="mr-1" /> Payment successfully transferred
-              </p>
-            )}
+                <p className="text-gray-600">
+                  {role === "client" ? "Designer: " : "Client: "}
+                  <span className="font-medium">
+                    {role === "client" ? designer?.name || designer?.email : client?.name || client?.email}
+                  </span>
+                </p>
+              </div>
+              {transferSuccess && (
+                <p className="text-green-600 mt-2 flex items-center">
+                  <FiDollarSign className="mr-1" /> Payment successfully transferred
+                </p>
+              )}
+            </ErrorBoundary>
           </div>
           <div className="flex space-x-3">
             <button
@@ -493,25 +540,28 @@ function ProjectPage() {
           </div>
         )}
 
-        
+
         {/* Project Details */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Column - Request Details */}
           <div className="md:col-span-2">
-            
+
             {/* HTML Content Section */}
             <div className="bg-white shadow-md rounded-xl overflow-hidden mb-6">
               <div className="p-6 border-b border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">HTML Design</h2>
-                <p className="text-gray-600 text-sm">
-                  {role === "designer" && projectStatus !== "completed" 
-                    ? "Upload your HTML design for the client to view." 
-                    : htmlContent 
-                    ? "You can view the HTML design below." 
-                    : "No HTML design has been uploaded yet."}
-                </p>
+                <ErrorBoundary fallback="HTML design information is available.">
+                  <p className="text-gray-600 text-sm">
+                    {role === "designer" 
+                      ? (projectStatus !== "completed"
+                          ? "Upload your HTML design for the client to view."
+                          : lastUpdatedText)
+                      : "You can view the HTML design below"}
+                  </p>
+                </ErrorBoundary>
+
               </div>
-              
+
               <div className="p-6 bg-gray-50">
                 {role === "designer" && projectStatus !== "completed" && (
                   <div className="space-y-4">
@@ -524,12 +574,12 @@ function ProjectPage() {
                         onChange={(e) => {
                           const file = e.target.files[0];
                           if (!file) return;
-                          
+
                           if (!file.name.toLowerCase().endsWith('.html') && !file.name.toLowerCase().endsWith('.htm')) {
                             setError('Only .html/.htm files are supported');
                             return;
                           }
-                          
+
                           const reader = new FileReader();
                           reader.onload = async (event) => {
                             const htmlContent = event.target.result;
@@ -553,6 +603,7 @@ function ProjectPage() {
                         </span>
                       </label>
                     </div>
+
                     <button
                       onClick={handleMarkAsCompletedByDesigner}
                       className="w-full bg-[#C19A6B] text-white px-4 py-2 rounded-lg hover:bg-[#A0784A] transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -577,13 +628,15 @@ function ProjectPage() {
                     </button>
                   </div>
                 )}
-                
+
                 {/* HTML content preview */}
                 {htmlContent && (
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm text-green-600 font-medium">HTML design has been uploaded successfully</p>
+                      
                       {(role === "designer" || projectStatus === "completed") && (
+                        <>
+                        <p className="text-sm text-green-600 font-medium">HTML design has been uploaded successfully</p>
                         <button
                           onClick={() => {
                             const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
@@ -600,10 +653,10 @@ function ProjectPage() {
                         >
                           <FiDownload className="mr-1" /> Download HTML
                         </button>
+                        </>
                       )}
-                    
                     </div>
-                    
+
                     {/* HTML Preview */}
                     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                       <div className="border-b border-gray-200 px-4 py-2 bg-gray-50 flex justify-between items-center">
@@ -621,7 +674,7 @@ function ProjectPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {/* For client to mark project as completed */}
                 {role === "client" && projectStatus === "completed_by_designer" && (
                   <div className="mt-6">
@@ -649,12 +702,12 @@ function ProjectPage() {
                 )}
               </div>
             </div>
-            
+
             {/* Rating Form - Only show for clients after project completion */}
             {role === "client" && projectStatus === "completed" && showRatingForm && (
               <div className="bg-white shadow-md rounded-xl overflow-hidden mb-6 p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Rate Designer</h2>
-                <DesignerRating 
+                <DesignerRating
                   clientId={user.uid}
                   designerId={proposal?.designerId}
                   projectId={proposalId}
@@ -667,33 +720,33 @@ function ProjectPage() {
               <div className="p-6 border-b border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-800 mb-2">Project Details</h2>
               </div>
-              
+
               <div className="p-6">
                 {request && (
                   <div className="mb-6 pb-6 border-b border-gray-100">
                     <h3 className="font-medium text-gray-900 mb-3">Request Information</h3>
-                     {/* Reference Image Display */}
-                  {request.referenceImageUrl && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Reference Image</h4>
-                      <div className="relative w-full h-48 rounded-md overflow-hidden border border-gray-300 cursor-pointer">
-                        <img
-                          src={request.referenceImageUrl}
-                          alt="Reference Image"
-                          className="w-full h-full object-contain"
-                          onClick={() => setZoomImage(request.referenceImageUrl)}
-                        />
+                    {/* Reference Image Display */}
+                    {request.referenceImageUrl && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Reference Image</h4>
+                        <div className="relative w-full h-48 rounded-md overflow-hidden border border-gray-300 cursor-pointer">
+                          <img
+                            src={request.referenceImageUrl}
+                            alt="Reference Image"
+                            className="w-full h-full object-contain"
+                            onClick={() => setZoomImage(request.referenceImageUrl)}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  
-                  {/* Image Zoom Modal */}
-                  {zoomImage && (
-                    <ImageZoomModal 
-                      imageUrl={zoomImage} 
-                      onClose={() => setZoomImage(null)} 
-                    />
-                  )}
+                    )}
+
+                    {/* Image Zoom Modal */}
+                    {zoomImage && (
+                      <ImageZoomModal
+                        imageUrl={zoomImage}
+                        onClose={() => setZoomImage(null)}
+                      />
+                    )}
                     <p className="text-gray-600 mb-4">{request.description}</p>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="bg-gray-50 p-3 rounded-lg">
@@ -721,7 +774,7 @@ function ProjectPage() {
                     )}
                   </div>
                 )}
-                
+
                 <div>
                   <h3 className="font-medium text-gray-900 mb-3">Proposal Information</h3>
                   <p className="text-gray-600 mb-4">{proposal.description}</p>
@@ -746,81 +799,21 @@ function ProjectPage() {
 
           {/* Right Column - Contact Info & Actions */}
           <div>
-            {/* Contact Information */}
-            <div className="bg-white shadow-md rounded-xl overflow-hidden mb-6">
-              <div className="p-6 border-b border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                  {role === "client" ? "Designer Information" : "Client Information"}
-                </h2>
-              </div>
-              
-              <div className="p-6">
-                {role === "client" && designer && (
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-gray-500 text-sm mb-1">Name</h3>
-                      <p className="font-medium text-gray-900">{designer.name || "Not provided"}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-gray-500 text-sm mb-1">Email</h3>
-                      <p className="font-medium text-gray-900">{designer.email}</p>
-                    </div>
-                    {designer.phone && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-gray-500 text-sm mb-1">Phone</h3>
-                        <p className="font-medium text-gray-900">{designer.phone}</p>
-                      </div>
-                    )}
-                    {designer.specialization && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-gray-500 text-sm mb-1">Specialization</h3>
-                        <p className="font-medium text-gray-900">{designer.specialization}</p>
-                      </div>
-                    )}
-                    {designer.experience && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-gray-500 text-sm mb-1">Experience</h3>
-                        <p className="font-medium text-gray-900">{designer.experience} years</p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => navigate(`/designer-portfolio/${designer.id}`)}
-                      className="w-full mt-2 px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105"
-                    >
-                      View Portfolio
-                    </button>
-                  </div>
-                )}
-                
-                {role === "designer" && client && (
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-gray-500 text-sm mb-1">Name</h3>
-                      <p className="font-medium text-gray-900">{client.name || "Not provided"}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-gray-500 text-sm mb-1">Email</h3>
-                      <p className="font-medium text-gray-900">{client.email}</p>
-                    </div>
-                    {client.phone && (
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-gray-500 text-sm mb-1">Phone</h3>
-                        <p className="font-medium text-gray-900">{client.phone}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
 
             {/* Project Actions */}
             <div className="bg-white shadow-md rounded-xl overflow-hidden">
               <div className="p-6 border-b border-gray-100">
                 <h2 className="text-lg font-semibold text-gray-800 mb-2">Project Actions</h2>
               </div>
-              
+
               <div className="p-6">
                 <div className="space-y-4">
+                <button
+                      onClick={() => navigate(`/designer-portfolio/${role === 'client' ? proposal.designerId : proposal.clientId}`)}
+                      className="w-full mt-2 px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105"
+                    >
+                      View Portfolio
+                    </button>
                   <button
                     onClick={startConversation}
                     className="w-full px-5 py-3 border border-[#C19A6B] text-[#C19A6B] rounded-lg hover:bg-[#C19A6B]/10 transition-all flex items-center justify-center gap-2"
@@ -828,7 +821,7 @@ function ProjectPage() {
                     <FiMessageSquare />
                     <span>Message {role === "client" ? "Designer" : "Client"}</span>
                   </button>
-                  
+
                   {role === "designer" && (
                     <button
                       onClick={() => navigate(`/projects?proposalId=${proposalId}`)}
@@ -838,9 +831,9 @@ function ProjectPage() {
                       <span>Project Panel</span>
                     </button>
                   )}
-                  
-                 
-                  
+
+
+
                   {role === "client" && projectStatus === "completed_by_designer" && (
                     <button
                       onClick={handleMarkAsCompleted}
@@ -861,7 +854,7 @@ function ProjectPage() {
       </div>
     </div>
   );
-  
+
 }
 
 export default ProjectPage;

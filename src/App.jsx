@@ -52,8 +52,6 @@ function App() {
     location.pathname.startsWith("/messages/") ||
     location.pathname.startsWith("/design-preview/") ||
     location.pathname.startsWith("/dashboard") ||
-    location.pathname.startsWith("/designer") ||
-    location.pathname.startsWith("/admin-profile") ||
     location.pathname === "/client-request"
 
   return (

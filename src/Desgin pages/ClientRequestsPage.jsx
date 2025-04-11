@@ -467,16 +467,21 @@ function ClientRequestsPage() {
                               onClick={async () => {
                                 try {
                                   // Import needed only when the function is called
-                                  const { sendMessage } = await import("../firebase/messages");
+                                  const { sendMessage, findExistingConversation } = await import("../firebase/messages");
                                   
-                                  // Start a new conversation with the designer
-                                  const conversationId = await sendMessage({
-                                    senderId: user.uid,
-                                    receiverId: proposal.designerId,
-                                    content: `Hello, I'm interested in your proposal for my "${selectedRequest.title}" request.`,
-                                  });
+                                  // Check if there's an existing conversation between these users
+                                  let conversationId = await findExistingConversation(user.uid, proposal.designerId);
                                   
-                                  // Navigate to the conversation
+                                  // If no existing conversation, create a new one with greeting message
+                                  if (!conversationId) {
+                                    conversationId = await sendMessage({
+                                      senderId: user.uid,
+                                      receiverId: proposal.designerId,
+                                      content: `Hello, I'm interested in your proposal for my "${selectedRequest.title}" request.`,
+                                    });
+                                  }
+                                  
+                                  // Navigate to the conversation without sending duplicate message
                                   window.location.href = `/messages/${conversationId}`;
                                 } catch (error) {
                                   console.error("Error starting conversation:", error);

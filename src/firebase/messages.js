@@ -44,6 +44,33 @@ export const sendMessage = async ({
   }
 };
 
+// Find existing conversation between two users
+export const findExistingConversation = async (userId1, userId2) => {
+  try {
+    // Query for conversations where both users are participants
+    const q = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', userId1)
+    );
+
+    const querySnapshot = await getDocs(q);
+    
+    // Check each conversation to see if the other user is also a participant
+    for (const doc of querySnapshot.docs) {
+      const conversationData = doc.data();
+      if (conversationData.participants.includes(userId2)) {
+        return doc.id; // Return the conversation ID if found
+      }
+    }
+    
+    // Return null if no existing conversation is found
+    return null;
+  } catch (error) {
+    console.error('Error finding existing conversation:', error);
+    return null;
+  }
+};
+
 // Get all conversations for a user
 export const getUserConversations = async (userId) => {
   try {
