@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 src\firebase\firebaseConfig.js
+ server/home-customization-67874-firebase-adminsdk-fbsvc-22053b9df4.json
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
