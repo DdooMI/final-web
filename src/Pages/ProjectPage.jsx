@@ -5,12 +5,14 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   runTransaction,
   serverTimestamp,
-  updateDoc
+  updateDoc,
+  where
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
-import { FiCheck, FiCode, FiDollarSign, FiDownload, FiMessageSquare, FiSettings } from "react-icons/fi";
+import { FiCheck, FiCode, FiDollarSign, FiDownload, FiMessageSquare, FiSettings, FiStar } from "react-icons/fi";
 import { useNavigate, useParams } from "react-router-dom";
 import DesignerRating from "../Components/DesignerRating";
 import ErrorBoundary from "../Components/ErrorBoundary";
@@ -40,12 +42,40 @@ function ProjectPage() {
   const [zoomImage, setZoomImage] = useState(null);
   const [htmlContent, setHtmlContent] = useState('');
   const [htmlFileName, setHtmlFileName] = useState('');
+  const [projectRating, setProjectRating] = useState(null);
 
   useEffect(() => {
     if (user && user.uid) {
       fetchBalance(user.uid);
     }
   }, [user, fetchBalance]);
+
+  // Fetch project rating when project is completed
+  useEffect(() => {
+    const fetchProjectRating = async () => {
+      if (projectStatus === "completed" && proposalId) {
+        try {
+          const ratingsRef = collection(db, "ratings");
+          const q = query(
+            ratingsRef,
+            where("projectId", "==", proposalId)
+          );
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const ratingData = querySnapshot.docs[0].data();
+            setProjectRating({
+              ...ratingData,
+              id: querySnapshot.docs[0].id
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching project rating:", error);
+        }
+      }
+    };
+
+    fetchProjectRating();
+  }, [projectStatus, proposalId]);
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -356,6 +386,44 @@ function ProjectPage() {
   }
  
   // Handle rating submission
+  const handleRequestChanges = async () => {
+    if (!proposal) return;
+
+    setUpdateLoading(true);
+    setError(null);
+
+    try {
+      const proposalRef = doc(db, "designProposals", proposalId);
+
+      // Update proposal status back to in_progress
+      await updateDoc(proposalRef, {
+        projectStatus: "in_progress",
+        htmlUpdatedAt: serverTimestamp()
+      });
+
+      // Create notification for designer
+      await createNotification({
+        userId: proposal?.designerId,
+        title: "Design Changes Requested",
+        message: `The client has requested changes for the project "${request?.title || 'Design Project'}". Please review and update the design.`,
+        type: "info",
+        relatedId: proposalId,
+      });
+
+      // Update local state
+      setProjectStatus("in_progress");
+      setUpdateSuccess(true);
+      setTimeout(() => {
+        setUpdateSuccess(false);
+      }, 3000);
+    } catch (err) {
+      console.error('Status update failed:', err);
+      setError(err.message);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   const handleRatingSubmit = (ratingData) => {
     // Hide the rating form after submission
     setShowRatingForm(false);
@@ -527,6 +595,36 @@ function ProjectPage() {
             </button>
           </div>
         </div>
+
+        {/* Project Rating Section */}
+        {projectStatus === "completed" && projectRating && (
+          <div className="mb-6 bg-white shadow-md rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-4">Project Rating</h3>
+            <div className="flex items-center mb-3">
+              <div className="flex items-center">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <FiStar
+                    key={star}
+                    className={`${star <= projectRating.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} text-xl`}
+                  />
+                ))}
+              </div>
+              <span className="ml-2 text-gray-600">
+                {projectRating.rating === 1 && 'Poor'}
+                {projectRating.rating === 2 && 'Fair'}
+                {projectRating.rating === 3 && 'Good'}
+                {projectRating.rating === 4 && 'Very Good'}
+                {projectRating.rating === 5 && 'Excellent'}
+              </span>
+            </div>
+            {projectRating.comment && (
+              <p className="text-gray-700 italic">"{projectRating.comment}"</p>
+            )}
+            <p className="text-sm text-gray-500 mt-2">
+              Rated {formatDistanceToNow(projectRating.createdAt.toDate(), { addSuffix: true })}
+            </p>
+          </div>
+        )}
 
         {updateSuccess && (
           <div
@@ -703,8 +801,8 @@ function ProjectPage() {
               </div>
             </div>
 
-            {/* Rating Form - Only show for clients after project completion */}
-            {role === "client" && projectStatus === "completed" && showRatingForm && (
+            {/* Rating Form Section */}
+            {projectStatus === "completed" && showRatingForm && (
               <div className="bg-white shadow-md rounded-xl overflow-hidden mb-6 p-6">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Rate Designer</h2>
                 <DesignerRating
@@ -808,12 +906,14 @@ function ProjectPage() {
 
               <div className="p-6">
                 <div className="space-y-4">
-                <button
-                      onClick={() => navigate(`/designer-portfolio/${role === 'client' ? proposal.designerId : proposal.clientId}`)}
-                      className="w-full mt-2 px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105"
-                    >
-                      View Portfolio
-                    </button>
+                {role !== 'designer' && (
+                  <button
+                    onClick={() => navigate(`/designer-portfolio/${role === 'client' ? proposal.designerId : proposal.clientId}`)}
+                    className="w-full mt-2 px-4 py-2 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105"
+                  >
+                    View Portfolio
+                  </button>
+                )}
                   <button
                     onClick={startConversation}
                     className="w-full px-5 py-3 border border-[#C19A6B] text-[#C19A6B] rounded-lg hover:bg-[#C19A6B]/10 transition-all flex items-center justify-center gap-2"
@@ -835,16 +935,28 @@ function ProjectPage() {
 
 
                   {role === "client" && projectStatus === "completed_by_designer" && (
-                    <button
-                      onClick={handleMarkAsCompleted}
-                      className="w-full px-5 py-3 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105 flex items-center justify-center gap-2"
-                      disabled={updateLoading}
-                    >
-                      <FiCheck />
-                      <span>
-                        {updateLoading ? "Processing..." : "Confirm Completion"}
-                      </span>
-                    </button>
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleMarkAsCompleted}
+                        className="w-full px-5 py-3 bg-[#C19A6B] text-white rounded-lg hover:bg-[#A0784A] transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                        disabled={updateLoading}
+                      >
+                        <FiCheck />
+                        <span>
+                          {updateLoading ? "Processing..." : "Confirm Completion"}
+                        </span>
+                      </button>
+                      <button
+                        onClick={handleRequestChanges}
+                        className="w-full px-5 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                        disabled={updateLoading}
+                      >
+                        <FiSettings />
+                        <span>
+                          {updateLoading ? "Processing..." : "Request Changes"}
+                        </span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

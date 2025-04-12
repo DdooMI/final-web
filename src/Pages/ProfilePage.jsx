@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { collection, query, where, getDocs, getDoc, doc, onSnapshot } from "firebase/firestore";
+import { FiStar } from "react-icons/fi";
+import { getDesignerRating } from "../firebase/ratings";
+import RatingDetailsModal from "../Components/RatingDetailsModal";
 import { db } from "../firebase/firebaseConfig";
 import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
@@ -29,6 +32,8 @@ export default function ProfilePage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const notificationsRef = useRef(null);
+  const [designerRating, setDesignerRating] = useState({ averageRating: 0, ratingCount: 0 });
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Close notifications dropdown when clicking outside
   useEffect(() => {
@@ -68,16 +73,48 @@ export default function ProfilePage() {
       setUnreadNotifications(snapshot.docs.length);
       
       // Get the 5 most recent notifications for the dropdown
-      const notificationsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
-      }))
+      const notificationsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let createdAt;
+        try {
+          createdAt = data.createdAt?.toDate() || new Date();
+        } catch (error) {
+          console.error('Error parsing notification timestamp:', error);
+          createdAt = new Date();
+        }
+        return {
+          id: doc.id,
+          ...data,
+          relatedId: data.relatedId || null,
+          createdAt
+        };
+      })
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 5);
       
       setNotifications(notificationsData);
     });
+
+    // Handle notification click
+    const handleNotificationClick = async (notification) => {
+      try {
+        // Update notification as read
+        const notificationRef = doc(db, "notifications", notification.id);
+        await updateDoc(notificationRef, { read: true });
+
+        // Navigate based on notification type and relatedId
+        if (notification.relatedId) {
+          if (role === 'designer') {
+            navigate(`/project/${notification.relatedId}`);
+          } else {
+            navigate(`/project/${notification.relatedId}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error handling notification:', error);
+      }
+    };
+
 
     // Subscribe to unread message count
     const unsubscribeMessages = subscribeToUnreadMessageCount(user.uid, (count) => {
@@ -89,6 +126,22 @@ export default function ProfilePage() {
       unsubscribeMessages();
     };
   }, [user]);
+
+  // Fetch designer rating
+  useEffect(() => {
+    if (role === 'designer' && user?.uid) {
+      const fetchRating = async () => {
+        try {
+          const rating = await getDesignerRating(user.uid);
+          setDesignerRating(rating);
+        } catch (error) {
+          console.error('Error fetching designer rating:', error);
+          setDesignerRating({ averageRating: 0, ratingCount: 0 });
+        }
+      };
+      fetchRating();
+    }
+  }, [user?.uid, role]);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -148,22 +201,28 @@ export default function ProfilePage() {
   };
   const handleSave = async () => {
     try {
-      if (!imageFile && newName === profile.name) {
+      if (!imageFile && newName === profile?.name && newBio === profile?.bio && 
+          newSpecialization === profile?.specialization && newExperience === profile?.experience) {
         setEditMode(false);
         return;
       }
 
-      let uploadedImageUrl = profile.photoURL;
+      let uploadedImageUrl = profile?.photoURL;
 
       if (imageFile) {
-        const imageData = new FormData();
-        imageData.append("file", imageFile);
-        imageData.append("upload_preset", "home_customization");
-        imageData.append("cloud_name", "dckwbkqjv");
+        try {
+          const imageData = new FormData();
+          imageData.append("file", imageFile);
+          imageData.append("upload_preset", "home_customization");
+          imageData.append("cloud_name", "dckwbkqjv");
 
-        const res = await axiosApi.post("", imageData);
-
-        uploadedImageUrl = res.data.secure_url;
+          const res = await axiosApi.post("", imageData);
+          uploadedImageUrl = res.data.secure_url;
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          alert('Failed to upload image. Please try again.');
+          return;
+        }
       }
 
       await updateProfile({
@@ -235,10 +294,10 @@ export default function ProfilePage() {
                       </div>
                     ) : (
                       notifications.map((notification) => (
-                        <NavLink
+                        <div
                           key={notification.id}
-                          to={`/notifications?id=${notification.relatedId || ''}`}
-                          className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                          onClick={() => handleNotificationClick(notification)}
+                          className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 cursor-pointer"
                         >
                           <div className="flex items-start">
                             <div className="flex-shrink-0 bg-[#A67B5B]/10 p-2 rounded-full">
@@ -254,7 +313,7 @@ export default function ProfilePage() {
                               </p>
                             </div>
                           </div>
-                        </NavLink>
+                        </div>
                       ))
                     )}
                   </div>
@@ -443,7 +502,7 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
                 <span
                   className={`inline-block px-4 py-1.5 rounded-full text-sm font-medium ${role === "designer"
                       ? "bg-[#A67B5B]/10 text-[#A67B5B]"
@@ -452,6 +511,41 @@ export default function ProfilePage() {
                 >
                   {role?.charAt(0).toUpperCase() + role?.slice(1)}
                 </span>
+
+                {role === 'designer' && (
+                  <div className="space-y-2">
+                    <div 
+                      className="flex items-center space-x-2 mt-2 group cursor-pointer hover:opacity-90 transition-all"
+                      onClick={() => setShowRatingModal(true)}
+                      role="button"
+                      aria-label="View rating details"
+                      tabIndex={0}
+                    >
+                      <div className="flex items-center" aria-label={`Rating: ${designerRating.averageRating.toFixed(1)} out of 5 stars`}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <FiStar
+                            key={star}
+                            className={`w-5 h-5 transition-colors ${star <= Math.round(designerRating.averageRating) 
+                              ? 'text-yellow-400 fill-yellow-400 group-hover:text-yellow-500 group-hover:fill-yellow-500' 
+                              : 'text-gray-300 group-hover:text-gray-400'}`}
+                            aria-hidden="true"
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 group-hover:text-gray-700">
+                        {designerRating.averageRating.toFixed(1)} ({designerRating.ratingCount} {designerRating.ratingCount === 1 ? 'review' : 'reviews'})
+                      </span>
+                    </div>
+                    {showRatingModal && (
+                      <RatingDetailsModal
+                        isOpen={showRatingModal}
+                        onClose={() => setShowRatingModal(false)}
+                        rating={designerRating}
+                        designerId={user?.uid}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

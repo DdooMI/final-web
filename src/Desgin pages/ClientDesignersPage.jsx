@@ -4,6 +4,8 @@ import { useAuth } from "../zustand/auth";
 import { Navigate, useNavigate } from "react-router-dom";
 import { collection, getDoc, getDocs, query, where, doc } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
+import { FiStar } from "react-icons/fi";
+import { getDesignerRating } from "../firebase/ratings";
 
 function ClientDesignersPage() {
   const { user, role } = useAuth();
@@ -34,15 +36,22 @@ function ClientDesignersPage() {
             profileData = profileSnap.data();
           }
 
+          // Get designer's rating
+          const rating = await getDesignerRating(docRef.id);
+
           designersData.push({
             id: docRef.id,
             email: designerData.email,
             name: profileData.name,
             photoURL: profileData.photoURL,
+            rating: rating.averageRating || 0,
+            ratingCount: rating.ratingCount || 0
           });
         }
 
-        setDesigners(designersData);
+        // Sort designers by rating (highest first)
+        const sortedDesigners = designersData.sort((a, b) => b.rating - a.rating);
+        setDesigners(sortedDesigners);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -103,7 +112,21 @@ function ClientDesignersPage() {
                   <h2 className="text-xl font-semibold text-gray-900 mb-2">
                     {designer.name}
                   </h2>
-                  <p className="text-gray-600 mb-4">{designer.email}</p>
+                  
+                  
+                  <div className="flex items-center mb-4">
+                    <div className="flex items-center">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <FiStar
+                          key={star}
+                          className={`${star <= designer.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'} w-5 h-5`}
+                        />
+                      ))}
+                    </div>
+                    <span className="ml-2 text-sm text-gray-600">
+                      ({designer.ratingCount} reviews)
+                    </span>
+                  </div>
 
                   <div className="space-y-2">
                     <button

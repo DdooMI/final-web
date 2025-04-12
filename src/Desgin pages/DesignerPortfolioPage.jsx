@@ -1,9 +1,12 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { useState, useEffect } from "react";
-import { useParams, Navigate } from "react-router-dom";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { useParams, Navigate, useNavigate } from "react-router-dom";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { useAuth } from "../zustand/auth";
+import { FiStar } from "react-icons/fi";
+import { getDesignerRating } from "../firebase/ratings";
+import RatingDetailsModal from "../Components/RatingDetailsModal";
 
 function DesignerPortfolioPage() {
   const { designerId } = useParams();
@@ -12,7 +15,8 @@ function DesignerPortfolioPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [designerRating, setDesignerRating] = useState({ averageRating: 0, ratingCount: 0 });
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Redirect if not logged in
   if (!user) {
@@ -61,17 +65,46 @@ function DesignerPortfolioPage() {
           experience: profileData.experience || "Not specified",
         });
 
-        // Get designer's projects
-        const projectsRef = collection(db, "users", designerId, "projects");
-        const projectsSnap = await getDocs(projectsRef);
-        const projectsData = [];
+        // Fetch designer rating
+        try {
+          const rating = await getDesignerRating(designerId);
+          setDesignerRating(rating);
+        } catch (error) {
+          console.error('Error fetching designer rating:', error);
+          setDesignerRating({ averageRating: 0, ratingCount: 0 });
+        }
 
-        projectsSnap.forEach((doc) => {
-          projectsData.push({
-            id: doc.id,
-            ...doc.data(),
-          });
-        });
+        // Get designer's completed projects
+        const proposalsRef = collection(db, 'designProposals');
+        const q = query(
+          proposalsRef,
+          where('designerId', '==', designerId),
+          where('status', '==', 'completed')
+        );
+
+        const proposalsSnap = await getDocs(q);
+        const projectsData = await Promise.all(proposalsSnap.docs.map(async (docu) => {
+          const proposalData = docu.data();
+          const requestRef = doc(db, 'designRequests', proposalData.requestId);
+          const requestSnap = await getDoc(requestRef);
+          
+          // Get client profile
+          const clientProfileRef = doc(db, 'users', proposalData.clientId, 'profile', 'profileInfo');
+          const clientProfileSnap = await getDoc(clientProfileRef);
+          const clientName = clientProfileSnap.exists()
+            ? clientProfileSnap.data().name
+            : 'Client';
+
+          return {
+            id: docu.id,
+            ...proposalData,
+            referenceImageUrl: requestSnap.exists()
+              ? requestSnap.data().referenceImageUrl
+              : '/project-placeholder.jpg',
+            clientName,
+            title: requestSnap.exists() ? requestSnap.data().title : 'Untitled Project'
+          };
+        }));
 
         setProjects(projectsData);
       } catch (err) {
@@ -87,11 +120,7 @@ function DesignerPortfolioPage() {
     }
   }, [designerId]);
 
-  // Filter projects based on active tab
-  const filteredProjects =
-    activeTab === "all"
-      ? projects
-      : projects.filter((project) => project.status === activeTab);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -164,6 +193,36 @@ function DesignerPortfolioPage() {
                   </div>
 
                   <div className="border-t border-gray-200 pt-6">
+                    {/* Rating Section */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center">
+                            <span className="text-3xl font-bold text-[#C19A6B] mr-2">
+                              {designerRating.averageRating.toFixed(1)}
+                            </span>
+                            <div className="flex">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <FiStar
+                                  key={star}
+                                  className={`w-6 h-6 ${star <= designerRating.averageRating ? 'text-[#C19A6B] fill-current' : 'text-gray-300'}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {designerRating.ratingCount} {designerRating.ratingCount === 1 ? 'review' : 'reviews'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowRatingModal(true)}
+                          className="px-4 py-2 text-sm bg-[#C19A6B]/10 text-[#C19A6B] rounded-lg hover:bg-[#C19A6B]/20 transition-colors"
+                        >
+                          View Reviews
+                        </button>
+                      </div>
+                    </div>
+
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">About</h3>
                     <p className="text-gray-600 leading-relaxed mb-6">{designer.bio}</p>
                     
@@ -184,48 +243,31 @@ function DesignerPortfolioPage() {
 
             {/* Projects Section */}
             <div className="mt-12">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-3xl font-bold text-gray-900">Portfolio Projects</h2>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setActiveTab('all')}
-                    className={`px-4 py-2 rounded-lg transition-all duration-300 ${activeTab === 'all' ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    All Projects
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('completed')}
-                    className={`px-4 py-2 rounded-lg transition-all duration-300 ${activeTab === 'completed' ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    Completed
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('in-progress')}
-                    className={`px-4 py-2 rounded-lg transition-all duration-300 ${activeTab === 'in-progress' ? 'bg-[#C19A6B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    In Progress
-                  </button>
-                </div>
-              </div>
-
+              <h2 className="text-3xl font-bold text-gray-900 mb-8">Portfolio Projects</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredProjects.map((project) => (
+                {projects.map((project) => (
                   <div key={project.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-                    {project.imageUrl ? (
-                      <img src={project.imageUrl} alt={project.title} className="w-full h-48 object-cover" />
-                    ) : (
-                      <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                        <span className="text-gray-400">No image available</span>
+                    <div className="relative h-48">
+                      <img 
+                        src={project.referenceImageUrl} 
+                        alt={project.title} 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                        <p className="text-white text-sm">Client: {project.clientName}</p>
                       </div>
-                    )}
+                    </div>
                     <div className="p-6">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">{project.title}</h3>
-                      <p className="text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+                      <p className="text-gray-600 mb-4 line-clamp-2">{project.description || 'No description available'}</p>
                       <div className="flex items-center justify-between">
-                        <span className={`px-3 py-1 rounded-full text-sm ${project.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {project.status}
+                        <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                          Completed
                         </span>
-                        <button className="text-[#C19A6B] hover:text-[#A0784A] font-medium">
+                        <button 
+                          onClick={() => navigate(`/project/${project.id}`)}
+                          className="text-[#C19A6B] hover:text-[#A0784A] font-medium"
+                        >
                           View Details →
                         </button>
                       </div>
@@ -234,7 +276,7 @@ function DesignerPortfolioPage() {
                 ))}
               </div>
 
-              {filteredProjects.length === 0 && (
+              {projects.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-600">No projects found in this category.</p>
                 </div>
@@ -250,9 +292,18 @@ function DesignerPortfolioPage() {
           </div>
         </div>
       )}
+
+      {/* Rating Details Modal */}
+      {showRatingModal && (
+        <RatingDetailsModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          rating={designerRating}
+          designerId={designerId}
+        />
+      )}
     </div>
   );
-  
 }
 
 export default DesignerPortfolioPage;
