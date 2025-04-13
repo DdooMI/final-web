@@ -13,7 +13,6 @@ import ProfilePage from "./Pages/ProfilePage";
 import ProjectsPage from "./Pages/ProjectsPage";
 import ProjectPage from "./Pages/ProjectPage";
 import NotificationsPage from "./Pages/NotificationsPage";
-import NotificationDetailPage from "./Pages/NotificationDetailPage";
 import MessagesPage from "./Pages/MessagesPage";
 import MessageDetailPage from "./Pages/MessageDetailPage";
 
@@ -71,7 +70,6 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/notifications/:id" element={<NotificationDetailPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/messages/:conversationId" element={<MessageDetailPage />} />
         <Route path="/payment" element={<PaymentPage />} />

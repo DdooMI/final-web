@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../zustand/auth";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { formatDistanceToNow } from "date-fns";
@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 function NotificationsPage() {
   const { user,role } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
+  const navigate = useNavigate();
 
   // Redirect if not logged in
   if (!user) {
@@ -184,15 +185,15 @@ function NotificationsPage() {
                         // Check if it's a Project Completed notification
                         if (notification.title === "Project Completed by Designer" || notification.title === "Project Marked as Completed" || notification.title === "Design Changes Requested") {
                           // Navigate directly to the project page
-                          window.location.href = `/project/${notification.relatedId}`;
+                          navigate(`/project/${notification.relatedId}`);
                         }
                         // Check if it's any proposal-related notification for a designer
                         else if (role === "designer" && notification.title.includes("Proposal")) {
                           // Navigate to designer proposals page for designers
-                          window.location.href = `/designer-proposals?proposalId=${notification.relatedId}`;
+                          navigate(`/designer-proposals?proposalId=${notification.relatedId}`);
                         } else {
                           // For clients or other notification types, navigate to client requests page
-                          window.location.href = `/client-requests?requestId=${notification.relatedId}`;
+                          navigate(`/client-requests?requestId=${notification.relatedId}`);
                         }
                       }
                     } catch (error) {

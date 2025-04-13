@@ -104,10 +104,18 @@ export default function ProfilePage() {
 
         // Navigate based on notification type and relatedId
         if (notification.relatedId) {
-          if (role === 'designer') {
+          // Check if it's a Project Completed notification
+          if (notification.title === "Project Completed by Designer" || 
+              notification.title === "Project Marked as Completed" || 
+              notification.title === "Design Changes Requested") {
             navigate(`/project/${notification.relatedId}`);
+          }
+          // Check if it's any proposal-related notification for a designer
+          else if (role === "designer" && notification.title.includes("Proposal")) {
+            navigate(`/designer-proposals?proposalId=${notification.relatedId}`);
           } else {
-            navigate(`/project/${notification.relatedId}`);
+            // For clients or other notification types, navigate to client requests page
+            navigate(`/client-requests?requestId=${notification.relatedId}`);
           }
         }
       } catch (error) {
@@ -250,10 +258,10 @@ export default function ProfilePage() {
             <div className="font-bold text-xl text-white">Portfolio</div>
             <div className="flex items-center space-x-4">
               {/* Notifications Button with Dropdown */}
-              <div className="relative" ref={notificationsRef}>
-                <button 
-                  className="text-white hover:text-gray-200 transition-colors"
-                  onClick={() => setShowNotifications(!showNotifications)}
+              <div className="relative">
+                <NavLink 
+                  to="/notifications" 
+                  className="text-white hover:text-gray-200 transition-colors group relative"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -274,50 +282,10 @@ export default function ProfilePage() {
                       {unreadNotifications}
                     </span>
                   )}
-                </button>
-                
-                {/* Notifications Dropdown */}
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50 max-h-96 overflow-y-auto">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-semibold text-gray-700">Notifications</h3>
-                        <NavLink to="/notifications" className="text-xs text-[#A67B5B] hover:underline">
-                          View all
-                        </NavLink>
-                      </div>
-                    </div>
-                    
-                    {notifications.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                        No new notifications
-                      </div>
-                    ) : (
-                      notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          onClick={() => handleNotificationClick(notification)}
-                          className="block px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 cursor-pointer"
-                        >
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0 bg-[#A67B5B]/10 p-2 rounded-full">
-                              <svg className="w-5 h-5 text-[#A67B5B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div className="ml-3 w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900">{notification.title}</p>
-                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                {notification.createdAt ? formatDistanceToNow(notification.createdAt, { addSuffix: true }) : 'Just now'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
+                  <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+                    Notifications
+                  </span>
+                </NavLink>
               </div>
               
               {/* Messages Button */}
@@ -434,24 +402,28 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Specialization</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A67B5B] focus:border-[#A67B5B] outline-none transition"
-                        value={newSpecialization}
-                        onChange={(e) => setNewSpecialization(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">Years of Experience</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A67B5B] focus:border-[#A67B5B] outline-none transition"
-                        value={newExperience}
-                        onChange={(e) => setNewExperience(e.target.value)}
-                      />
-                    </div>
+                    {role === 'designer' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">Specialization</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A67B5B] focus:border-[#A67B5B] outline-none transition"
+                          value={newSpecialization}
+                          onChange={(e) => setNewSpecialization(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {role === 'designer' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">Years of Experience</label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A67B5B] focus:border-[#A67B5B] outline-none transition"
+                          value={newExperience}
+                          onChange={(e) => setNewExperience(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
                   <input
                     type="file"
