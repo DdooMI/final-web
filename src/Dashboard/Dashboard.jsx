@@ -10,7 +10,9 @@ import {
   where,
   orderBy,
   limit,
-  Timestamp
+  Timestamp,
+  getDoc,
+  doc
 } from "firebase/firestore";
 
 export default function Dashboard() {
@@ -66,7 +68,7 @@ export default function Dashboard() {
     try {
       // Get users statistics
       const usersSnapshot = await getDocs(collection(db, "users"));
-      const totalUsers = usersSnapshot.size;
+      let totalUsers = usersSnapshot.size;
       
       // Count designers and clients
       let designers = 0;
@@ -141,15 +143,14 @@ export default function Dashboard() {
       // Process each client
       for (const clientDoc of clientsSnapshot.docs) {
         const clientId = clientDoc.id;
-        const clientData = clientDoc.data();
         
         // Get client profile
-        const profileQuery = query(collection(db, "users", clientId, "profile"));
-        const profileSnapshot = await getDocs(profileQuery);
+        const profileRef = doc(db, "users", clientId, "profile", "profileInfo");
+        const profileSnap = await getDoc(profileRef);
         let profileData = {};
         
-        if (!profileSnapshot.empty) {
-          profileData = profileSnapshot.docs[0].data();
+        if (profileSnap.exists()) {
+          profileData = profileSnap.data();
         }
         
         // Get client projects
@@ -167,28 +168,25 @@ export default function Dashboard() {
         
         projectsSnapshot.forEach(doc => {
           const projectData = doc.data();
-          if (projectData.clientRating) {
-            totalRating += projectData.clientRating;
+          if (projectData.designerRating) {
+            totalRating += projectData.designerRating;
             ratingCount++;
           }
         });
         
         const rating = ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : 0;
         
-        // Only add clients with ratings
-        if (ratingCount > 0) {
-          clientsData.push({
-            id: clientId,
-            name: profileData.name || "Unknown Client",
-            industry: profileData.industry || "Unknown Industry",
-            rating: parseFloat(rating),
-            projects,
-            avatar: profileData.photoURL || "/person.gif"
-          });
-        }
+        // Add all clients, not just those with ratings
+        clientsData.push({
+          id: clientId,
+          name: profileData.name || "Unknown Client",
+         
+          projects,
+          avatar: profileData.photoURL || "/person.gif"
+        });
       }
       
-      // Sort by rating and limit to top 5
+      // Sort by rating and projects, then limit to top 3
       const topClients = clientsData
         .sort((a, b) => b.rating - a.rating || b.projects - a.projects)
         .slice(0, 3);
@@ -235,16 +233,19 @@ export default function Dashboard() {
         const projectsSnapshot = await getDocs(projectsQuery);
         const projects = projectsSnapshot.size;
         
-        // Calculate average rating
-        let totalRating = 0;
-        let ratingCount = 0;
+        // Get designer ratings from ratings collection
+        const ratingsQuery = query(
+          collection(db, "ratings"),
+          where("designerId", "==", designerId)
+        );
         
-        projectsSnapshot.forEach(doc => {
-          const projectData = doc.data();
-          if (projectData.designerRating) {
-            totalRating += projectData.designerRating;
-            ratingCount++;
-          }
+        const ratingsSnapshot = await getDocs(ratingsQuery);
+        let totalRating = 0;
+        let ratingCount = ratingsSnapshot.size;
+        
+        ratingsSnapshot.forEach(doc => {
+          const ratingData = doc.data();
+          totalRating += ratingData.rating;
         });
         
         const rating = ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : 0;
@@ -259,7 +260,7 @@ export default function Dashboard() {
         });
       }
       
-      // Sort by rating and limit to top 5
+      // Sort by rating and limit to top 3
       const topDesigners = designersData
         .sort((a, b) => b.rating - a.rating || b.projects - a.projects)
         .slice(0, 3);
@@ -277,9 +278,7 @@ export default function Dashboard() {
       // Get recent completed projects
       const projectsQuery = query(
         collection(db, "designProposals"),
-        where("status", "in", ["completed", "completed_by_designer"]),
-        orderBy("completedAt", "desc"),
-        limit(8)
+        where("status", "in", ["completed", "accepted"])
       );
       
       const projectsSnapshot = await getDocs(projectsQuery);
@@ -291,25 +290,25 @@ export default function Dashboard() {
         const projectData = projectDoc.data();
         
         // Get client info
-        const clientProfileQuery = query(collection(db, "users", projectData.clientId, "profile"));
-        const clientProfileSnapshot = await getDocs(clientProfileQuery);
+        const clientProfileRef = doc(db, "users", projectData.clientId, "profile", "profileInfo");
+        const clientProfileSnap = await getDoc(clientProfileRef);
         let clientName = "Unknown Client";
         let clientAvatar = "/person.gif";
         
-        if (!clientProfileSnapshot.empty) {
-          const clientProfileData = clientProfileSnapshot.docs[0].data();
+        if (clientProfileSnap.exists()) {
+          const clientProfileData = clientProfileSnap.data();
           clientName = clientProfileData.name || "Unknown Client";
           clientAvatar = clientProfileData.photoURL || "/person.gif";
         }
         
         // Get designer info
-        const designerProfileQuery = query(collection(db, "users", projectData.designerId, "profile"));
-        const designerProfileSnapshot = await getDocs(designerProfileQuery);
+        const designerProfileRef = doc(db, "users", projectData.designerId, "profile", "profileInfo");
+        const designerProfileSnap = await getDoc(designerProfileRef);
         let designerName = "Unknown Designer";
         let designerAvatar = "/person.gif";
         
-        if (!designerProfileSnapshot.empty) {
-          const designerProfileData = designerProfileSnapshot.docs[0].data();
+        if (designerProfileSnap.exists()) {
+          const designerProfileData = designerProfileSnap.data();
           designerName = designerProfileData.name || "Unknown Designer";
           designerAvatar = designerProfileData.photoURL || "/person.gif";
         }
@@ -321,7 +320,7 @@ export default function Dashboard() {
           clientAvatar,
           designerName,
           designerAvatar,
-          completedAt: projectData.completedAt ? projectData.completedAt.toDate() : new Date(),
+          completedAt: projectData.updatedAt ? projectData.updatedAt.toDate() : new Date(),
           price: projectData.price || 0,
           rating: projectData.clientRating || 0
         });
@@ -502,9 +501,7 @@ export default function Dashboard() {
                     <p className="text-xs text-gray-500">{client.industry}</p>
                   </div>
                   <div className="flex items-center">
-                    <StarIcon className="h-4 w-4 text-yellow-400" />
-                    <span className="text-sm font-medium ml-1">{client.rating}</span>
-                    <span className="text-xs text-gray-500 ml-2">{client.projects} projects</span>
+                    <span className="text-xs text-gray-500">{client.projects} projects</span>
                   </div>
                 </div>
               ))

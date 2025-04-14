@@ -120,6 +120,7 @@ function DesignerRequestsPage() {
         designerId: user.uid,
         designerEmail: user.email,
         clientId: selectedRequest.userId,
+        title: selectedRequest.title,
         price: proposalData.price,
         estimatedTime: proposalData.estimatedTime,
         description: proposalData.description,
