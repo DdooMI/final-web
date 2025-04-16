@@ -43,7 +43,6 @@ function App() {
   const hideNavFooter =
     location.pathname === "/login" ||
     location.pathname === "/signup" ||
-    location.pathname === "/profile" ||
     location.pathname === "/forgot-password" ||
     location.pathname === "/projects" ||
     location.pathname === "/payment" ||

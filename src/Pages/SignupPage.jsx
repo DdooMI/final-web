@@ -8,14 +8,12 @@ import {
   FaUser,
   FaEnvelope,
   FaLock,
-  FaGoogle,
-  FaFacebook,
-  FaGithub,
   FaPencilAlt,
   FaHome,
 } from "react-icons/fa";
 import { useState } from "react";
 import { createSignupNotification } from "../firebase/signupNotification";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const schema = z
   .object({
@@ -41,6 +39,8 @@ const schema = z
 
 function Signup() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const {
     register,
     handleSubmit,
@@ -115,19 +115,26 @@ function Signup() {
               <FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A67B5B]" />
             </div>
             <p className="text-red-500 text-sm text-left">
-              {errors.email?.message || error}
+              {errors.email?.message}
             </p>
 
             <div className="relative">
               <motion.input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 {...register("password")}
-                className="w-full p-4 pl-12 pr-4 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300 "
+                className="w-full p-4 pl-12 pr-12 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300"
                 whileFocus={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 400 }}
               />
               <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A67B5B]" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A67B5B] hover:text-[#8B6B4A] transition-colors"
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
             </div>
             <p className="text-red-500 text-sm text-left">
               {errors.password?.message}
@@ -135,14 +142,21 @@ function Signup() {
 
             <div className="relative">
               <motion.input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm Password"
                 {...register("confirmPassword")}
-                className="w-full p-4 pl-12 pr-4 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300"
+                className="w-full p-4 pl-12 pr-12 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300"
                 whileFocus={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 400 }}
               />
               <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A67B5B]" />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A67B5B] hover:text-[#8B6B4A] transition-colors"
+              >
+                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
             </div>
             <p className="text-red-500 text-sm text-left">
               {errors.confirmPassword?.message}
@@ -255,50 +269,9 @@ function Signup() {
                 Sign In
               </NavLink>
             </p>
-
-            <div className="relative my-6">
-              <hr className="border-t border-white/20" />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#6e5a46] px-4 text-white/70 text-sm">
-                OR
-              </span>
-            </div>
           </div>
         </form>
-        <div className="flex justify-center space-x-4 mt-4">
-          <motion.button
-            onClick={() => {
-              // Handle Google signup
-              console.log("Google signup clicked");
-            }}
-            className="p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <FaGoogle className="text-2xl text-red-500" />
-          </motion.button>
-          <motion.button
-            onClick={() => {
-              // Handle Facebook signup
-              console.log("Facebook signup clicked");
-            }}
-            className="p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <FaFacebook className="text-2xl text-blue-500" />
-          </motion.button>
-          <motion.button
-            onClick={() => {
-              // Handle Github signup
-              console.log("Github signup clicked");
-            }}
-            className="p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <FaGithub className="text-2xl text-white" />
-          </motion.button>
-        </div>
+      
       </motion.div>
     </div>
   );

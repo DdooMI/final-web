@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import z from "zod";
 import { useAuth } from "../zustand/auth";
 import { motion } from "framer-motion";
+import { toast, Toaster } from "react-hot-toast";
 import {
   FaEnvelope,
   FaLock,
@@ -11,11 +12,13 @@ import {
   FaFacebook,
   FaGithub,
   FaHome,
-  FaExclamationCircle,
+  FaPencilAlt,
 } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const schema = z.object({
+ 
   email: z.string().email("Invalid email address"),
   password: z
     .string()
@@ -26,7 +29,27 @@ const schema = z.object({
 
 function Login() {
   const [isLoading, setIsLoading] = useState(false);
-  const { login, error } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("client");
+  const { login, signInWithGoogle, error, clearError } = useAuth();
+
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error, {
+        duration: 3000,
+        position: "top-center",
+        style: {
+          background: "#FEE2E2",
+          color: "#DC2626",
+          border: "1px solid #DC2626",
+        },
+      });
+    }
+  }, [error]);
   const navigate = useNavigate();
   const {
     register,
@@ -47,28 +70,29 @@ function Login() {
     }
   };
 
-  const getErrorMessage = () => {
-    if (!error) return null;
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
-        transition={{ duration: 0.3 }}
-        className="bg-white border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-4 shadow-md"
-        role="alert"
-      >
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <FaExclamationCircle className="h-5 w-5 text-red-500" />
-          </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium">{error}</p>
-          </div>
-        </div>
-      </motion.div>
-    );
+  const handleGoogleSignIn = async () => {
+    if (!selectedRole) {
+      toast.error('Please select a role before signing in with Google', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#FEE2E2',
+          color: '#DC2626',
+          border: '1px solid #DC2626',
+        },
+      });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await signInWithGoogle(navigate, selectedRole);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   return (
     <div
@@ -88,8 +112,7 @@ function Login() {
           Sign In
         </h2>
 
-        {getErrorMessage()}
-
+        <Toaster />
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col space-y-3"
@@ -109,15 +132,21 @@ function Login() {
 
           <div className="relative">
             <motion.input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Password"
               {...register("password")}
-              className="w-full p-4 pl-12 pr-4 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300"
+              className="w-full p-4 pl-12 pr-12 border border-[#A67B5B]/50 rounded-xl text-lg focus:outline-none bg-white/95 focus:border-[#8B6B4A] focus:ring-2 focus:ring-[#8B6B4A]/30 transition-all duration-300"
               whileFocus={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 400 }}
             />
             <FaLock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A67B5B]" />
-           
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#A67B5B] hover:text-[#8B6B4A] transition-colors"
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
           </div>
           <p className="text-red-500 text-sm">{errors.password?.message}</p>
           
@@ -176,13 +205,62 @@ function Login() {
               OR
             </span>
           </div>
+
+         
         </form>
-        <div className="flex justify-center space-x-4 mt-4">
+        <div className="mb-4">
+            <p className="text-white text-xl font-semibold mb-2">Choose Your Role</p>
+            <p className="text-white/70 text-sm mb-4">Select your role before signing in</p>
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              initial={{ opacity: 0.8 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="relative group">
+                <input
+                  type="radio"
+                  id="rad1"
+                  value="designer"
+                  checked={selectedRole === "designer"}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="hidden peer"
+                />
+                <motion.label
+                  htmlFor="rad1"
+                  className={`cursor-pointer flex flex-col items-center p-6 rounded-xl border-2 border-white/30 hover:border-white/60 peer-checked:bg-[#A67B5B] peer-checked:border-[#A67B5B] peer-checked:text-white transition-all duration-300 relative overflow-hidden group-hover:shadow-lg`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FaPencilAlt className="text-3xl mb-3 text-[#dfb58e] group-hover:text-white transition-colors" />
+                  <span className="text-xl text-white font-semibold mb-2">Designer</span>
+                </motion.label>
+              </div>
+
+              <div className="relative group">
+                <input
+                  type="radio"
+                  id="rad2"
+                  value="client"
+                  checked={selectedRole === "client"}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="hidden peer"
+                />
+                <motion.label
+                  htmlFor="rad2"
+                  className={`cursor-pointer flex flex-col items-center p-6 rounded-xl border-2 border-white/30 hover:border-white/60 peer-checked:bg-[#A67B5B] peer-checked:border-[#A67B5B] peer-checked:text-white transition-all duration-300 relative overflow-hidden group-hover:shadow-lg`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FaHome className="text-3xl mb-3 text-[#dfb58e] group-hover:text-white transition-colors" />
+                  <span className="text-xl text-white font-semibold mb-2">Client</span>
+                </motion.label>
+              </div>
+            </motion.div>
+          </div>
+          <div className="flex justify-center space-x-4 mt-4">
           <motion.button
-            onClick={() => {
-              // Handle Google login
-              console.log("Google login clicked");
-            }}
+            onClick={handleGoogleSignIn}
             className="p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-0.5"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}

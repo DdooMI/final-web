@@ -277,7 +277,10 @@ function Nav() {
                   {user && (
                     <div
                       className="flex items-center space-x-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-all duration-300"
-                      onClick={() => navigate('/profile')}
+                      onClick={() => {
+                        navigate('/profile');
+                        closeAllDropdowns();
+                      }}
                     >
                       <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#C19A6B]/20 hover:border-[#C19A6B] transition-all duration-300 shadow-sm">
                         <img
@@ -472,8 +475,9 @@ function Nav() {
                   <div className="mt-auto px-3 py-4 border-t border-gray-100">
                     <button
                       onClick={() => {
-                        logout(navigate);
-                        closeAllDropdowns();
+                        if (window.confirm('Are you sure you want to logout?')) {
+                          logout(navigate);
+                        }
                       }}
                       className="flex items-center space-x-2 w-full px-4 py-3 text-left text-gray-700 hover:text-white hover:bg-[#FF0000]/80 rounded-lg transition-all duration-300"
                     >

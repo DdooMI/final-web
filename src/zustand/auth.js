@@ -2,10 +2,15 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { create } from "zustand";
 import { auth, db } from "../firebase/firebaseConfig";
+
+const googleProvider = new GoogleAuthProvider();
 
 export const useAuth = create((set, get) => ({
   user: JSON.parse(localStorage.getItem("user")) || null,
@@ -14,18 +19,106 @@ export const useAuth = create((set, get) => ({
   profile: JSON.parse(localStorage.getItem("profile")) || null,
   error: null,
 
+  clearError: () => set({ error: null }),
+
+  signInWithGoogle: async (navigation, selectedRole) => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      const token = await user.getIdToken();
+
+      // Check if user exists in Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // Create new user document if it doesn't exist
+        await setDoc(userRef, {
+          email: user.email,
+          role: selectedRole, // Use selected role from the UI
+          emailVerified: true,
+        });
+
+        // Create profile document
+        const profileRef = doc(db, "users", user.uid, "profile", "profileInfo");
+        const profileData = {
+          name: user.displayName || "",
+          photoURL: user.photoURL || "",
+        };
+        await setDoc(profileRef, profileData);
+
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("token", token);
+        localStorage.setItem("role", selectedRole); // Store selected role
+        localStorage.setItem("profile", JSON.stringify(profileData));
+
+        set({
+          user,
+          token,
+          role: selectedRole, // Use selected role in state
+          profile: profileData,
+          error: null,
+        });
+      } else {
+        const userData = userSnap.data();
+        const profileRef = doc(db, "users", user.uid, "profile", "profileInfo");
+        const profileSnap = await getDoc(profileRef);
+        const profileData = profileSnap.exists()
+          ? profileSnap.data()
+          : { name: user.displayName || "", photoURL: user.photoURL || "" };
+
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("token", token);
+        localStorage.setItem("role", userData.role);
+        localStorage.setItem("profile", JSON.stringify(profileData));
+
+        set({
+          user,
+          token,
+          role: userData.role,
+          profile: profileData,
+          error: null,
+        });
+      }
+
+      navigation("/");
+    } catch (err) {
+      let errorMessage = "An error occurred during Google sign-in";
+
+      if (err.code === "auth/popup-closed-by-user") {
+        errorMessage = "Sign-in popup was closed before completing";
+      } else if (err.code === "auth/cancelled-popup-request") {
+        errorMessage = "Another sign-in popup is already open";
+      } else if (err.code === "auth/popup-blocked") {
+        errorMessage = "Sign-in popup was blocked by the browser";
+      }
+
+      set({ error: errorMessage });
+    }
+  },
+
   login: async (data, navigation) => {
     try {
       const res = await signInWithEmailAndPassword(
         auth,
         data.email,
         data.password
-      );
+      )
       const user = res.user;
-      const token = await user.getIdToken();
+      
+      if (!user.emailVerified) {
+        set({ error: "Please verify your email before logging in." });
+        return;
+      }
 
+      const token = await user.getIdToken();
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
+      
+      // Update email verification status in Firestore
+      await updateDoc(userRef, {
+        emailVerified: true
+      });
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
@@ -64,8 +157,8 @@ export const useAuth = create((set, get) => ({
         errorMessage = "Invalid email address format";
       } else if (err.code === "auth/user-not-found") {
         errorMessage = "No account found with this email";
-      } else if (err.code === "auth/wrong-password") {
-        errorMessage = "Incorrect password";
+      } else if (err.code === "auth/invalid-credential") {
+        errorMessage = "Incorrect email or password";
       } else if (err.code === "auth/too-many-requests") {
         errorMessage = "Too many failed attempts. Please try again later";
       }
@@ -82,12 +175,15 @@ export const useAuth = create((set, get) => ({
         data.password
       );
       const user = res.user;
-      const token = await user.getIdToken();
+      
+      // Send email verification
+      await sendEmailVerification(user);
 
       const userRef = doc(db, "users", user.uid);
       await setDoc(userRef, {
         email: user.email,
         role: data.role,
+        emailVerified: false,
       });
 
       const profileRef = doc(db, "users", user.uid, "profile", "profileInfo");
@@ -97,12 +193,13 @@ export const useAuth = create((set, get) => ({
       };
       await setDoc(profileRef, profileData);
 
-      localStorage.setItem("user", JSON.stringify(user));
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", data.role);
-      localStorage.setItem("profile", JSON.stringify(profileData));
-
-      set({ user, token, role: data.role, profile: profileData, error: null });
+      set({ 
+        user: null,
+        token: null,
+        role: null,
+        profile: null,
+        error: null
+      });
 
       navigation("/login");
     } catch (err) {

@@ -22,7 +22,6 @@ export default function ProfilePage() {
   const [newSpecialization, setNewSpecialization] = useState(profile?.specialization || "");
   const [newExperience, setNewExperience] = useState(profile?.experience || "");
   const [imageFile, setImageFile] = useState();
-  const [fileName, setFileName] = useState("Choose an image");
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -205,7 +204,6 @@ export default function ProfilePage() {
     const file = event.target.files[0];
     if (!file) return;
     setImageFile(file);
-    setFileName(file.name);
   };
   const handleSave = async () => {
     try {
@@ -242,7 +240,7 @@ export default function ProfilePage() {
       });
 
       setEditMode(false);
-      setFileName("Choose an image");
+     
       setImageFile(null);
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -250,107 +248,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      {/* Header/Navigation */}
-      <header className="bg-gradient-to-r from-[#A67B5B] to-[#C19A6B] shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="font-bold text-xl text-white">Portfolio</div>
-            <div className="flex items-center space-x-4">
-              {/* Notifications Button with Dropdown */}
-              <div className="relative">
-                <NavLink 
-                  to="/notifications" 
-                  className="text-white hover:text-gray-200 transition-colors group relative"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-white text-[#C19A6B] text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                      {unreadNotifications}
-                    </span>
-                  )}
-                  <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                    Notifications
-                  </span>
-                </NavLink>
-              </div>
-              
-              {/* Messages Button */}
-              <div className="relative mr-4">
-                <NavLink to="/messages" className="text-white hover:text-gray-200 transition-colors group relative">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  {unreadMessages > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-white text-[#C19A6B] text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                      {unreadMessages}
-                    </span>
-                  )}
-                  <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                    Messages
-                  </span>
-                </NavLink>
-              </div>
- 
-              
-              {/* Logout Button */}
-              <button
-                className="text-white hover:text-gray-200 transition-colors group relative"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to logout?')) {
-                    logout(navigate);
-                  }
-                }}
-                title="Logout"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-7 w-7"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-                <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
-                  Logout
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="bg-gradient-to-b from-gray-50 to-gray-100">
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-30">
         {/* Profile Header */}
         <div className="bg-white rounded-2xl shadow-xl mb-8 p-8">
           <div className="flex flex-col md:flex-row items-start gap-8">
@@ -425,19 +325,6 @@ export default function ProfilePage() {
                       </div>
                     )}
                   </div>
-                  <input
-                    type="file"
-                    id="fileInput"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                  <label
-                    htmlFor="fileInput"
-                    className="border px-2 py-1 rounded cursor-pointer bg-gray-100 hover:bg-gray-200"
-                  >
-                    {fileName}
-                  </label>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -521,29 +408,48 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className=" flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               {editMode ? (
-                <>
+                <div className="flex space-x-4">
                   <button
                     onClick={handleSave}
-                    className="px-4 py-2 bg-[#A67B5B] text-white rounded-md"
+                    className="px-6 py-2 bg-[#A67B5B] text-white rounded-lg hover:bg-[#8B6B4A] transition-colors"
                   >
-                    Save
+                    Save Changes
                   </button>
                   <button
-                    onClick={() => setEditMode(false)}
-                    className="px-4 py-2 border rounded-md"
+                    onClick={() => {
+                      setEditMode(false);
+                      setNewName(profile?.name || "");
+                      setNewBio(profile?.bio || "");
+                      setNewSpecialization(profile?.specialization || "");
+                      setNewExperience(profile?.experience || "");
+                      setImageFile(null);
+                    }}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                   >
                     Cancel
                   </button>
-                </>
+                </div>
               ) : (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="px-4 py-2 bg-[#A67B5B] text-white rounded-md"
-                >
-                  Edit Profile
-                </button>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="px-6 py-2 bg-[#A67B5B] text-white rounded-lg hover:bg-[#8B6B4A] transition-colors"
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to logout?')) {
+                        logout(navigate);
+                      }
+                    }}
+                  >
+                    Logout
+                  </button>
+                </div>
               )}
             </div>
           </div>

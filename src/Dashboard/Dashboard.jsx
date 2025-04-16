@@ -26,6 +26,7 @@ export default function Dashboard() {
     totalProjects: 0,
     completedProjects: 0,
     pendingProjects: 0,
+    inProgressProjects: 0,
     totalRevenue: 0
   });
   const [topClients, setTopClients] = useState([]);
@@ -93,6 +94,7 @@ export default function Dashboard() {
       // Count completed projects and calculate revenue
       let completed = 0;
       let pending = 0;
+      let inProgress = 0;
       let totalRevenue = 0;
       
       proposalsSnapshot.forEach((doc) => {
@@ -110,6 +112,8 @@ export default function Dashboard() {
           }
         } else if (projectData.status === "pending") {
           pending++;
+        } else if (projectData.status === "accepted") {
+          inProgress++;
         }
       });
       
@@ -120,6 +124,7 @@ export default function Dashboard() {
         totalProjects,
         completedProjects: completed,
         pendingProjects: pending,
+        inProgressProjects: inProgress,
         totalRevenue
       });
     } catch (err) {
