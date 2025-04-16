@@ -55,7 +55,9 @@ function DesignerRequestsPage() {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const q = query(collection(db, "designRequests"));
+        const q = query(
+          collection(db, "designRequests")
+        );
         const querySnapshot = await getDocs(q);
         const requestsData = [];
 
@@ -101,6 +103,11 @@ function DesignerRequestsPage() {
 
   const handleSubmitProposal = async (e) => {
     e.preventDefault();
+
+    if (selectedRequest.status === "completed") {
+      setError("Cannot submit proposal for a completed request.");
+      return;
+    }
 
     if (Number(proposalData.price) > Number(selectedRequest.budget)) {
       setError(
@@ -162,7 +169,20 @@ function DesignerRequestsPage() {
       setIsSubmitting(false);
     }
   };
-
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "accepted":
+        return "bg-green-100 text-green-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      case "completed":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
   return (
     <div className="min-h-screen bg-gray-50 pt-30 pb-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -198,6 +218,9 @@ function DesignerRequestsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#C19A6B]"></div>
           </div>
         ) : requests.length === 0 ? (
+
+  
+
           <div className="bg-white shadow rounded-lg p-6 text-center">
             <p className="text-lg text-gray-700">
               No design requests available at the moment.
@@ -225,7 +248,11 @@ function DesignerRequestsPage() {
                       <h3 className="font-medium text-gray-900">
                         {request.title}
                       </h3>
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(
+                          request.status
+                        )}`}
+                      >
                         {request.status}
                       </span>
                     </div>
@@ -304,6 +331,12 @@ function DesignerRequestsPage() {
                   <div className="p-4 bg-yellow-50 rounded-lg">
                     <p className="text-yellow-800">
                       You have already submitted a proposal for this request. You cannot submit multiple proposals for the same request.
+                    </p>
+                  </div>
+                ) : selectedRequest.status === "completed" ? (
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-800">
+                      This request has been completed. You can view it but cannot submit a proposal.
                     </p>
                   </div>
                 ) : (

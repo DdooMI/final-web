@@ -172,7 +172,15 @@ function ClientRequestPage() {
           <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center">
               <span className="text-gray-700 font-medium">Your Available Balance:</span>
-              <span className="text-xl font-bold text-[#C19A6B]">${balance.toFixed(2)} USD</span>
+              <div className="flex items-center gap-4">
+                <span className="text-xl font-bold text-[#C19A6B]">${balance.toFixed(2)} USD</span>
+                <button
+                  onClick={() => navigate('/payment')}
+                  className="px-4 py-2 bg-[#C19A6B] text-white rounded-md hover:bg-[#A0784A] transition-colors duration-300 flex items-center gap-2"
+                >
+                  Add Funds
+                </button>
+              </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">Your budget must not exceed your available balance.</p>
           </div>

@@ -273,13 +273,15 @@ function ProjectPage() {
       await updateDoc(proposalRef, {
         projectStatus: "completed",
         status: "completed",
+        completedAt: serverTimestamp()
       });
 
       // Update the request status to completed
       if (proposal.requestId) {
         const requestRef = doc(db, "designRequests", proposal.requestId);
         await updateDoc(requestRef, {
-          status: "completed"
+          status: "completed",
+          completedAt: serverTimestamp()
         });
       }
 
@@ -323,8 +325,8 @@ function ProjectPage() {
           }
         } catch (transferError) {
           console.error('Error transferring funds:', transferError);
-          // Continue with completion even if transfer fails
-          // We'll handle this separately
+          setError('Failed to transfer funds. Please try again.');
+          return;
         }
       }
 
@@ -339,6 +341,12 @@ function ProjectPage() {
 
       // Update local state
       setProjectStatus("completed");
+      setProposal(prev => ({
+        ...prev,
+        projectStatus: "completed",
+        status: "completed",
+        completedAt: serverTimestamp() // Use serverTimestamp for consistency
+      }));
 
       // Show rating form
       setShowRatingForm(true);
@@ -349,7 +357,7 @@ function ProjectPage() {
       }, 3000);
     } catch (err) {
       console.error('Status update failed:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to mark project as completed');
     } finally {
       setUpdateLoading(false);
     }
@@ -535,11 +543,14 @@ function ProjectPage() {
       } else if (timestamp?.toDate) {
         // Handle Firestore Timestamp
         const updatedDate = timestamp.toDate();
-        return updatedDate.toLocaleString();
+        return formatDistanceToNow(updatedDate, { addSuffix: true });
       } else if (timestamp?.seconds) {
         // Fallback for raw timestamp
         const updatedDate = new Date(timestamp.seconds * 1000);
-        return updatedDate.toLocaleString();
+        return formatDistanceToNow(updatedDate, { addSuffix: true });
+      } else if (timestamp instanceof Date) {
+        // Handle JavaScript Date objects
+        return formatDistanceToNow(timestamp, { addSuffix: true });
       } else {
         return "recently";
       }
@@ -589,7 +600,7 @@ function ProjectPage() {
           <div className="flex space-x-3">
             <button
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all flex items-center gap-2 shadow-sm"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/designer-proposals")}
             >
               <span>Back</span>
             </button>
@@ -621,7 +632,7 @@ function ProjectPage() {
               <p className="text-gray-700 italic">"{projectRating.comment}"</p>
             )}
             <p className="text-sm text-gray-500 mt-2">
-              Rated {formatDistanceToNow(projectRating.createdAt.toDate(), { addSuffix: true })}
+              {projectRating.createdAt ? `Rated ${formatTimestamp(projectRating.createdAt)}` : "Recently rated"}
             </p>
           </div>
         )}
@@ -861,7 +872,7 @@ function ProjectPage() {
                       </div>
                       <div className="bg-gray-50 p-3 rounded-lg">
                         <span className="text-gray-500 block mb-1">Posted:</span>
-                        <span className="font-medium text-gray-900">{request.createdAt}</span>
+                        <span className="font-medium text-gray-900">{formatTimestamp(request.createdAt)}</span>
                       </div>
                     </div>
                     {request.additionalDetails && (
@@ -887,7 +898,7 @@ function ProjectPage() {
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <span className="text-gray-500 block mb-1">Submitted:</span>
-                      <span className="font-medium text-gray-900">{proposal.createdAt}</span>
+                      <span className="font-medium text-gray-900">{formatTimestamp(proposal.createdAt)}</span>
                     </div>
                   </div>
                 </div>

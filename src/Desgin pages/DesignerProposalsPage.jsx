@@ -41,11 +41,21 @@ function DesignerProposalsPage() {
           proposalsData.push({
             id: doc.id,
             ...doc.data(),
+            createdAtTimestamp: doc.data().createdAt ? doc.data().createdAt.toDate() : null,
             createdAt:
               doc.data().createdAt
                 ? formatDistanceToNow(doc.data().createdAt.toDate(), { addSuffix: true })
                 : "Unknown date",
           });
+        });
+
+        // Sort proposals from newest to oldest
+        proposalsData.sort((a, b) => {
+          // Handle cases where createdAt might be null
+          if (!a.createdAtTimestamp) return 1;
+          if (!b.createdAtTimestamp) return -1;
+          // Sort in descending order (newest first)
+          return b.createdAtTimestamp - a.createdAtTimestamp;
         });
 
         setProposals(proposalsData);
@@ -371,7 +381,7 @@ function DesignerProposalsPage() {
                 )}
 
                 <div className="mt-6 flex justify-end space-x-3">
-                  {selectedProposal.status === "accepted" && (
+                  {selectedProposal.status !== "rejected" && (
                     <>
                       <button
                         className="px-3 py-1.5 border border-[#C19A6B] text-[#C19A6B] rounded hover:bg-[#C19A6B]/10 transition"
