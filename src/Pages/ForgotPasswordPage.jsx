@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth, db } from "../firebase/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { motion } from "framer-motion";
 import { FaEnvelope, FaArrowLeft, FaExclamationCircle, FaCheckCircle } from "react-icons/fa";
 import { z } from "zod";
@@ -33,16 +33,19 @@ function ForgotPasswordPage() {
     setSuccess(false);
 
     try {
-      // Check if user exists and is verified
-      const userRef = doc(db, "users", data.email);
-      const userSnap = await getDoc(userRef);
+      // Query users collection to find user by email
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", data.email));
+      const querySnapshot = await getDocs(q);
 
-      if (!userSnap.exists()) {
+      if (querySnapshot.empty) {
         setError("No account found with this email");
         return;
       }
 
-      const userData = userSnap.data();
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      
       if (!userData.emailVerified) {
         setError("Please verify your email before resetting password");
         return;

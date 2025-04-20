@@ -88,7 +88,7 @@ function ClientRequestPage() {
         imageData.append("file", imageFile);
         imageData.append("upload_preset", "home_customization");
         imageData.append("cloud_name", "dckwbkqjv");
-
+        console.log(imageData.getAll('file'));
         const res = await axiosApi.post("", imageData);
         referenceImageUrl = res.data.secure_url;
       }

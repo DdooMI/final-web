@@ -15,7 +15,7 @@ const PaymentPage = () => {
   const [paymentMethod] = useState("paypal")
   // Default operation type based on user role
   const [operationType, setOperationType] = useState("deposit")
-  const [amount, setAmount] = useState("50")
+  const [amount, setAmount] = useState("0")
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState(null)
