@@ -10,8 +10,6 @@ import { useNavigate, NavLink } from "react-router-dom";
 import { useAuth } from "../zustand/auth";
 import { axiosApi } from "../axios/axiosConfig";
 import UserBalance from "../payment/user-balance";
-import { subscribeToUnreadMessageCount } from "../firebase/messages";
-import { formatDistanceToNow } from "date-fns";
 
 export default function ProfilePage() {
 
@@ -26,113 +24,11 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const notificationsRef = useRef(null);
   const [designerRating, setDesignerRating] = useState({ averageRating: 0, ratingCount: 0 });
   const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Close notifications dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
-    };
 
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        setShowNotifications(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
-
-  // Fetch notifications and unread messages count
-  useEffect(() => {
-    if (!user) return;
-
-    const notificationsRef = collection(db, "notifications");
-    const q = query(
-      notificationsRef,
-      where("userId", "==", user.uid),
-      where("read", "==", false)
-    );
-
-    const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-      setUnreadNotifications(snapshot.docs.length);
-      
-      // Get the 5 most recent notifications for the dropdown
-      const notificationsData = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let createdAt;
-        try {
-          createdAt = data.createdAt?.toDate() || new Date();
-        } catch (error) {
-          console.error('Error parsing notification timestamp:', error);
-          createdAt = new Date();
-        }
-        return {
-          id: doc.id,
-          ...data,
-          relatedId: data.relatedId || null,
-          createdAt
-        };
-      })
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 5);
-      
-      setNotifications(notificationsData);
-    });
-
-    // Handle notification click
-    const handleNotificationClick = async (notification) => {
-      try {
-        // Update notification as read
-        const notificationRef = doc(db, "notifications", notification.id);
-        await updateDoc(notificationRef, { read: true });
-
-        // Navigate based on notification type and relatedId
-        if (notification.relatedId) {
-          // Check if it's a Project Completed notification
-          if (notification.title === "Project Completed by Designer" || 
-              notification.title === "Project Marked as Completed" || 
-              notification.title === "Design Changes Requested") {
-            navigate(`/project/${notification.relatedId}`);
-          }
-          // Check if it's any proposal-related notification for a designer
-          else if (role === "designer" && notification.title.includes("Proposal")) {
-            navigate(`/designer-proposals?proposalId=${notification.relatedId}`);
-          } else {
-            // For clients or other notification types, navigate to client requests page
-            navigate(`/client-requests?requestId=${notification.relatedId}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error handling notification:', error);
-      }
-    };
-
-
-    // Subscribe to unread message count
-    const unsubscribeMessages = subscribeToUnreadMessageCount(user.uid, (count) => {
-      setUnreadMessages(count);
-    });
-
-    return () => {
-      unsubscribeNotifications();
-      unsubscribeMessages();
-    };
-  }, [user]);
 
   // Fetch designer rating
   useEffect(() => {
