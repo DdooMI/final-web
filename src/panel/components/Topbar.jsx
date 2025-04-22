@@ -62,6 +62,14 @@ export default function Topbar() {
     dispatch({ type: 'REDO' })
   }
 
+  // Add new function to handle scene clearing
+  const handleClearScene = () => {
+    if (window.confirm('Are you sure you want to clear everything in the scene? This action cannot be undone.')) {
+      dispatch({ type: 'CLEAR_HOUSE_DIMENSIONS' })
+      toast.success('Scene cleared successfully')
+    }
+  }
+
   // Function to save design to Firebase
   const saveDesignToFirebase = async () => {
     if (!user || !proposalId) {
@@ -488,6 +496,15 @@ export default function Topbar() {
       </Link>
       
       <div className="flex gap-4">
+        <button 
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 transition-all duration-300 ease-in-out active:scale-95 hover:shadow-md"
+          onClick={handleClearScene}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          Clear Scene
+        </button>
         <button 
           className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2 transition-all duration-300 ease-in-out disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-800 active:scale-95 hover:shadow-md"
           onClick={handleUndo}

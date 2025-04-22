@@ -48,9 +48,15 @@ function Wall({
 function Floor({ position, size, length, color = "#808080" }) {
   const floorWidth = size;
   const floorLength = length || size;
+  
+  // Only add the 0.5 offset for individual floor tiles, not for house dimensions
+  const isHouseDimension = size > 1;
+  const xOffset = isHouseDimension ? 0 : 0.5;
+  const zOffset = isHouseDimension ? 0 : 0.5;
+  
   return (
     <mesh
-      position={[position.x, 0.01, position.z]}
+      position={[position.x + xOffset, 0.01, position.z + zOffset]}
       rotation={[-Math.PI / 2, 0, 0]}
       receiveShadow
     >
@@ -118,7 +124,6 @@ export default function Scene() {
   const [drawingPoints, setDrawingPoints] = useState([]);
   const [mousePosition, setMousePosition] = useState({ x: 0, z: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
-  const [isCurvedDrawing, setIsCurvedDrawing] = useState(false);
   const [furniturePreview, setFurniturePreview] = useState(null);
   const [previewRotation, setPreviewRotation] = useState(0);
 
@@ -345,36 +350,44 @@ export default function Scene() {
     return [0, 0, 0]; // The grid is already centered at origin
   }, []);
 
-  const snapToGrid = (point, isFloor = false) => {
+  const snapToGrid = (point, isFloor = false, isHouseDimension = false) => {
     // Calculate grid boundaries based on center position
     const halfWidth = gridWidth / 2;
     const halfLength = gridLength / 2;
 
-    // For floors, snap to grid cell centers
-    // For walls, snap to exact grid lines (whole numbers)
-    let gridX = isFloor ? Math.floor(point.x) + 0.5 : Math.round(point.x);
-    let gridZ = isFloor ? Math.floor(point.z) + 0.5 : Math.round(point.z);
+    let gridX, gridZ;
+    
+    if (isHouseDimension) {
+      // For house dimensions, use the original logic
+      gridX = point.x;
+      gridZ = point.z;
+    } else if (isFloor) {
+      // For individual floor tiles, snap to grid cell
+      gridX = Math.floor(point.x + halfWidth) - halfWidth;
+      gridZ = Math.floor(point.z + halfLength) - halfLength;
+    } else {
+      // For walls, snap to grid lines
+      gridX = Math.round(point.x);
+      gridZ = Math.round(point.z);
+    }
 
-    // Ensure the point is strictly within the grid boundaries (centered at origin)
-    // Clamp values to ensure they stay within grid boundaries
-    if (isFloor) {
-      // For floors, keep within the inner grid cells
-      gridX = Math.max(-halfWidth + 0.5, Math.min(gridX, halfWidth - 0.5));
-      gridZ = Math.max(-halfLength + 0.5, Math.min(gridZ, halfLength - 0.5));
+    // Ensure the point is strictly within the grid boundaries
+    if (isHouseDimension) {
+      // No clamping for house dimensions
+      return { x: gridX, z: gridZ };
+    } else if (isFloor) {
+      // For floors, keep within the grid cells
+      gridX = Math.max(-halfWidth, Math.min(gridX, halfWidth - 1));
+      gridZ = Math.max(-halfLength, Math.min(gridZ, halfLength - 1));
     } else {
       // For walls, allow drawing on the grid boundaries but not outside
       gridX = Math.max(-halfWidth, Math.min(gridX, halfWidth));
       gridZ = Math.max(-halfLength, Math.min(gridZ, halfLength));
     }
 
-    // Use the clamped values directly
-    const boundedX = gridX;
-    const boundedZ = gridZ;
-
-    // Return the point snapped to grid lines or cell centers
     return {
-      x: boundedX,
-      z: boundedZ,
+      x: gridX,
+      z: gridZ,
     };
   };
 
@@ -403,7 +416,7 @@ export default function Scene() {
   };
 
   // Handle pointer up event
-  const handlePointerUp = (event) => {
+  const handlePointerUp = () => {
     if (!isDrawing || drawingPoints.length === 0) return;
 
     // For wall creation
@@ -459,79 +472,6 @@ export default function Scene() {
   // Collision detection system for furniture placement
 
   // Check if furniture can be placed at the given position
-  const checkFurnitureCollision = (position, size, rotation, state) => {
-    // Early return if state is undefined
-    if (!state) return true;
-
-    // Calculate the actual size based on rotation
-    const actualSize =
-      rotation % Math.PI === 0
-        ? size
-        : { width: size.length, length: size.width };
-
-    // Use the same grid dimensions as defined in the component
-    const halfWidth = gridWidth / 2;
-    const halfLength = gridLength / 2;
-
-    // Check if furniture would be placed outside the grid
-    // Allow placement at the exact grid boundaries
-    if (
-      position.x < -halfWidth ||
-      position.x + actualSize.width > halfWidth ||
-      position.z < -halfLength ||
-      position.z + actualSize.length > halfLength
-    ) {
-      return false;
-    }
-
-    // Check for collisions with walls
-    if (state.walls && state.walls.length > 0) {
-      // Implementation of wall collision detection
-      // This is a simplified version - in a real app, you'd need more complex geometry
-      for (const wall of state.walls) {
-        // Check if furniture overlaps with any wall
-        // This is a simple bounding box check
-        const wallBounds = {
-          minX: Math.min(wall.start.x, wall.end.x) - 0.1,
-          maxX: Math.max(wall.start.x, wall.end.x) + 0.1,
-          minZ: Math.min(wall.start.z, wall.end.z) - 0.1,
-          maxZ: Math.max(wall.start.z, wall.end.z) + 0.1,
-        };
-
-        const furnitureBounds = {
-          minX: position.x,
-          maxX: position.x + actualSize.width,
-          minZ: position.z,
-          maxZ: position.z + actualSize.length,
-        };
-
-        if (
-          furnitureBounds.minX <= wallBounds.maxX &&
-          furnitureBounds.maxX >= wallBounds.minX &&
-          furnitureBounds.minZ <= wallBounds.maxZ &&
-          furnitureBounds.maxZ >= wallBounds.minZ
-        ) {
-          return false;
-        }
-      }
-    }
-
-    // Check all grid cells that would be occupied by this furniture
-    for (let x = 0; x < actualSize.width; x++) {
-      for (let z = 0; z < actualSize.length; z++) {
-        const cellX = Math.floor(position.x + x);
-        const cellZ = Math.floor(position.z + z);
-        const key = `${cellX},${cellZ}`;
-
-        // Check if cell is already occupied by other furniture
-        if (state.occupiedGridCells && state.occupiedGridCells[key]) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  };
 
   // Helper function to calculate distance from a point to a line segment
 
@@ -568,8 +508,14 @@ export default function Scene() {
               setIsDrawing(true);
               setDrawingPoints([...drawingPoints, snappedPoint]);
             } else if (state.activeShape === "floor") {
-              // Create a floor at the clicked position
-              const floorSize = 1; // Default size
+              const intersection = event.intersections[0];
+              if (!intersection) return;
+              
+              // Get the point of intersection
+              const point = intersection.point;
+              // Snap to grid for floor placement
+              const snappedPoint = snapToGrid(point, true, false);
+              const floorSize = 1; // Default size for individual floor tiles
               dispatch({
                 type: "ADD_FLOOR",
                 payload: {

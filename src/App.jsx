@@ -91,8 +91,10 @@ function App() {
         {/* Dashboard Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
-          <Route path="designer/:id" element={<DesignerProfile />} />
-          <Route path="client/:id" element={<ClientProfile />} />
+          <Route path="clients" element={<ClientsTable />} />
+          <Route path="clients/:id" element={<ClientProfile />} />
+          <Route path="designers" element={<DesignersTable />} />
+          <Route path="designers/:id" element={<DesignerProfile />} />
           <Route path="team" element={
             <div className="p-6 bg-white m-6 rounded-lg shadow-sm">
               <h1 className="text-2xl font-semibold text-gray-900 mb-6">Team</h1>
@@ -101,8 +103,6 @@ function App() {
           } />
           <Route path="settings" element={<Settings />} />
           <Route path="analytics" element={<Analytics />} />
-          <Route path="clients" element={<ClientsTable />} />
-          <Route path="designers" element={<DesignersTable />} />
           <Route path="admin-profile" element={<AdminProfile />} />
         </Route>
 

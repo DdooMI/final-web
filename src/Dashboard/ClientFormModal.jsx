@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { addClient, updateClient } from '../firebase/clients';
 import {axiosApi} from '../axios/axiosConfig';
+import { sendEmailVerification } from 'firebase/auth';
+
+import PropTypes from 'prop-types';
 
 export default function ClientFormModal({ isOpen, onClose, client = null, onSuccess }) {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         role: 'client',
-        rating: 0,
         photoURL: '',
         balance: 0,
         password: ''
@@ -44,7 +46,6 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
                 name: client.name || '',
                 email: client.email || '',
                 role: 'client',
-                rating: client.rating || 0,
                 photoURL: client.avatar || '',
                 balance: client.balance || 0
             });
@@ -55,7 +56,6 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
                 name: '',
                 email: '',
                 role: 'client',
-                rating: 0,
                 photoURL: '',
                 balance: 0,
                 password: ''
@@ -68,7 +68,7 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'rating' || name === 'balance' ? parseFloat(value) : value
+            [name]: name === 'balance' ? parseFloat(value) : value
         }));
     };
 
@@ -84,7 +84,6 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
                 name: formData.name,
                 photoURL: formData.photoURL,
                 balance: parseFloat(formData.balance) || 0,
-                rating: parseFloat(formData.rating) || 0,
                 password: formData.password
             };
 
@@ -93,7 +92,12 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
                 await updateClient(client.id, clientData);
             } else {
                 // Add new client
-                await addClient(clientData);
+                const newClient = await addClient(clientData);
+                
+                // Send verification email
+                if (newClient.user) {
+                    await sendEmailVerification(newClient.user);
+                }
             }
 
             onSuccess();
@@ -211,23 +215,6 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
                             </div>
 
                             <div>
-                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700">
-                                    Rating (0-5)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="rating"
-                                    id="rating"
-                                    min="0"
-                                    max="5"
-                                    step="0.1"
-                                    value={formData.rating}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#C19A6B] focus:ring-[#C19A6B]"
-                                />
-                            </div>
-
-                            <div>
                                 <label htmlFor="avatar" className="block text-sm font-medium text-gray-700">
                                     Profile Image
                                 </label>
@@ -288,3 +275,10 @@ export default function ClientFormModal({ isOpen, onClose, client = null, onSucc
         </div>
     );
 }
+
+ClientFormModal.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    client: PropTypes.object,
+    onSuccess: PropTypes.func.isRequired
+};

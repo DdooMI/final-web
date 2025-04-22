@@ -48,7 +48,7 @@ function Signup() {
   } = useForm({
     resolver: zodResolver(schema),
   });
-  const { signUp, error } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const onSubmit = async (data) => {

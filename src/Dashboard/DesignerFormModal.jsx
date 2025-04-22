@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { addDesigner, updateDesigner } from '../firebase/designers';
 import {axiosApi} from '../axios/axiosConfig';
+import { sendEmailVerification } from 'firebase/auth';
+import PropTypes from 'prop-types';
 
 export default function DesignerFormModal({ isOpen, onClose, designer = null, onSuccess }) {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        role: 'designer',
-        rating: 0,
-        photoURL: '',
-        balance: 0,
+        phone: '',
+        location: '',
+        specialties: '',
+        balance: '',
         password: ''
     });
     const [loading, setLoading] = useState(false);
@@ -43,10 +45,11 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
             setFormData({
                 name: designer.name || '',
                 email: designer.email || '',
-                role: 'designer',
-                rating: designer.rating || 0,
-                photoURL: designer.avatar || '',
-                balance: designer.balance || 0
+                phone: designer.phone || '',
+                location: designer.location || '',
+                specialties: designer.specialties?.join(', ') || '',
+                balance: designer.balance?.toString() || '',
+                password: ''
             });
             setAvatarPreview(designer.avatar || '/person.gif');
         } else {
@@ -54,10 +57,10 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
             setFormData({
                 name: '',
                 email: '',
-                role: 'designer',
-                rating: 0,
-                photoURL: '',
-                balance: 0,
+                phone: '',
+                location: '',
+                specialties: '',
+                balance: '',
                 password: ''
             });
             setAvatarPreview('/person.gif');
@@ -84,7 +87,6 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
                 name: formData.name,
                 photoURL: formData.photoURL,
                 balance: parseFloat(formData.balance) || 0,
-                rating: parseFloat(formData.rating) || 0,
                 password: formData.password
             };
 
@@ -93,7 +95,12 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
                 await updateDesigner(designer.id, designerData);
             } else {
                 // Add new designer
-                await addDesigner(designerData);
+                const newDesigner = await addDesigner(designerData);
+                
+                // Send verification email
+                if (newDesigner.user) {
+                    await sendEmailVerification(newDesigner.user);
+                }
             }
 
             onSuccess();
@@ -211,23 +218,6 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
                             </div>
 
                             <div>
-                                <label htmlFor="rating" className="block text-sm font-medium text-gray-700">
-                                    Rating (0-5)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="rating"
-                                    id="rating"
-                                    min="0"
-                                    max="5"
-                                    step="0.1"
-                                    value={formData.rating}
-                                    onChange={handleChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#C19A6B] focus:ring-[#C19A6B]"
-                                />
-                            </div>
-
-                            <div>
                                 <label htmlFor="avatar" className="block text-sm font-medium text-gray-700">
                                     Profile Image
                                 </label>
@@ -256,8 +246,6 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
                                     </div>
                                 )}
                             </div>
-
-
 
                             <div className="pt-3 border-t flex justify-end space-x-3">
                                 <button
@@ -290,6 +278,13 @@ export default function DesignerFormModal({ isOpen, onClose, designer = null, on
         </div>
     );
 }
+
+DesignerFormModal.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
+    designer: PropTypes.object,
+    onSuccess: PropTypes.func.isRequired
+};
 
 
 

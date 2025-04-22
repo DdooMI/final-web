@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { PencilIcon, TrashIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { fetchDesigners, deleteDesigner, getDesignerById } from '../firebase/designers';
 import DesignerFormModal from './DesignerFormModal';
+import { useNavigate } from 'react-router-dom';
 
 export default function DesignersTable() {
+  const navigate = useNavigate();
   const [designers, setDesigners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -131,7 +133,7 @@ export default function DesignersTable() {
         <div className="mt-4 sm:mt-0 sm:flex sm:items-center sm:space-x-4">
           <button
             onClick={handleAddDesigner}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#C19A6B] hover:bg-[#A0784A] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#3B82F6] hover:bg-[#488BF6FF] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
             Add Designer
@@ -190,8 +192,11 @@ export default function DesignersTable() {
                 </tr>
               ) : (
                 filteredAndSortedDesigners.map((designer) => (
-                  <tr key={designer.id} className="hover:bg-gray-50">
-                    
+                  <tr 
+                    key={designer.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/dashboard/designers/${designer.id}`)}
+                  >
                     <td className="px-4 py-2 whitespace-nowrap">
                       <img 
                         src={designer.avatar} 
@@ -208,20 +213,28 @@ export default function DesignersTable() {
                     <td className="px-4 py-2 whitespace-nowrap text-sm">{designer.role}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm">{designer.rating.toFixed(1)}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm">
-                      <button 
-                        className="text-indigo-600 hover:text-indigo-900 mr-2"
-                        title="Edit designer"
-                        onClick={() => handleEditDesigner(designer.id)}
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button 
-                        className="text-red-600 hover:text-red-900"
-                        onClick={() => handleDeleteDesigner(designer.id)}
-                        title="Delete designer"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Edit designer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditDesigner(designer.id);
+                          }}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button 
+                          className="text-red-600 hover:text-red-900"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDesigner(designer.id);
+                          }}
+                          title="Delete designer"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

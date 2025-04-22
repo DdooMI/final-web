@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { PencilIcon, TrashIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { fetchClients, deleteClient, getClientById } from '../firebase/clients';
 import ClientFormModal from './ClientFormModal';
+import { useNavigate } from 'react-router-dom';
 
 export default function ClientsTable() {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -131,7 +133,7 @@ export default function ClientsTable() {
         <div className="mt-4 sm:mt-0 sm:flex sm:items-center sm:space-x-4">
           <button
             onClick={handleAddClient}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#C19A6B] hover:bg-[#A0784A] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#3B82F6] hover:bg-[#5A96F8FF] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
           >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
             Add Client
@@ -190,8 +192,11 @@ export default function ClientsTable() {
                 </tr>
               ) : (
                 filteredAndSortedClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50">
-                    
+                  <tr 
+                    key={client.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/dashboard/clients/${client.id}`)}
+                  >
                     <td className="px-4 py-2 whitespace-nowrap">
                       <img 
                         src={client.avatar} 
@@ -208,20 +213,28 @@ export default function ClientsTable() {
                     <td className="px-4 py-2 whitespace-nowrap text-sm">{client.role}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm">{client.rating.toFixed(1)}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm">
-                      <button 
-                        className="text-indigo-600 hover:text-indigo-900 mr-2"
-                        title="Edit client"
-                        onClick={() => handleEditClient(client.id)}
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button 
-                        className="text-red-600 hover:text-red-900"
-                        onClick={() => handleDeleteClient(client.id)}
-                        title="Delete client"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Edit client"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClient(client.id);
+                          }}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button 
+                          className="text-red-600 hover:text-red-900"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClient(client.id);
+                          }}
+                          title="Delete client"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
