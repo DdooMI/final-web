@@ -2,8 +2,8 @@ import About from "../Components/About"
 import Contact from "../Components/Contact"
 import Hero from "../Components/Hero"
 import Product from "../Components/Product"
-import Services from "../Components/services"
-import Testimonials from "../Components/testimonials"
+import Services from "../Components/Services"
+import Testimonials from "../Components/Testimonials"
 
 function IndexPage() {
     return (
