@@ -1,9 +1,9 @@
 @import "tailwindcss";
 #home {
-    background: url('./Assets/home.gif') no-repeat center center / cover;
+    background: url('/home.gif') no-repeat center center / cover;
 }
 #project {
-    background: url('./Assets/p1.gif') no-repeat center center / cover;
+    background: url('/p1.gif') no-repeat center center / cover;
     height: 60vh;
     width: 100%;
 }
