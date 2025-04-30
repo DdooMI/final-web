@@ -8,9 +8,9 @@ function Product() {
                     Our Projects
                 </h2>
                 <div className="flex flex-wrap justify-center gap-8">
-                    <ProductCard img="src\assets\LR1.png"/>
-                    <ProductCard img="src\assets\Bedroom.jpg"/>
-                    <ProductCard img="src\assets\Kitchen.jpg"/>
+                    <ProductCard img="/LR1.png"/>
+                    <ProductCard img="/Bedroom.jpg"/>
+                    <ProductCard img="/Kitchen.jpg"/>
                 </div>
             </section>
         </>

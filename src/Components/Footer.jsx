@@ -62,7 +62,7 @@ function Footer() {
               className="mr-[15px]"
             >
               <img
-                src="src\assets\facebook.svg"
+                src="/facebook.svg"
                 alt="Facebook"
                 className="w-[24px] h-[24px] hover:opacity-70"
               />
@@ -73,14 +73,14 @@ function Footer() {
               className="mr-[15px]"
             >
               <img
-                src="src\assets\instagram.svg"
+                src="/instagram.svg"
                 alt="Instagram"
                 className="w-[24px] h-[24px] hover:opacity-70"
               />
             </a>
             <a href="https://pinterest.com/yourprofile" target="_blank">
               <img
-                src="src\assets\pinterest.svg"
+                src="/pinterest.svg"
                 alt="Pinterest"
                 className="w-[24px] h-[24px] hover:opacity-70"
               />
