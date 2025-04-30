@@ -2,8 +2,7 @@
 function Hero(props) {
   return (
     <section
-      className="relative  h-screen flex flex-col justify-center items-start px-8 md:px-12 lg:px-24 text-white"
-      id={props.img}
+      className="relative h-screen flex flex-col justify-center items-start px-8 md:px-12 lg:px-24 text-white bg-[url('/home.gif')] bg-center bg-cover bg-no-repeat"
     >
       <div className="absolute inset-0 bg-black/30" />
       <div className="relative z-10">
