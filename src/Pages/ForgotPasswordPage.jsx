@@ -127,7 +127,7 @@ function ForgotPasswordPage() {
     <div
       className="flex justify-center items-center min-h-screen bg-cover bg-center p-6 bg-gradient-to-br from-[#2d251d] to-[#4a3c2e]"
       style={{
-        backgroundImage: "url('../public/ff.jpg')",
+        backgroundImage: "url('/ff.jpg')",
         backgroundBlendMode: "overlay",
       }}
     >
