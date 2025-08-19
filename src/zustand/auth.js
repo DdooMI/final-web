@@ -1,10 +1,10 @@
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  sendEmailVerification,
   GoogleAuthProvider,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { create } from "zustand";
@@ -106,49 +106,53 @@ export const useAuth = create((set, get) => ({
       )
       const user = res.user;
       
-      if (!user.emailVerified) {
-        set({ error: "Please verify your email before logging in." });
-        return;
-      }
-
       const token = await user.getIdToken();
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       
-      // Update email verification status in Firestore
-      await updateDoc(userRef, {
-        emailVerified: true
+      if (!userSnap.exists()) {
+        set({ error: "User not found in database." });
+        return;
+      }
+      
+      const userData = userSnap.data();
+      
+      // Check email verification status from Firestore instead of Firebase Auth
+      if (!userData.emailVerified) {
+        set({ error: "Please verify your email before logging in." });
+        return;
+      }
+      
+      // Update email verification status in Firestore if needed
+      if (!user.emailVerified) {
+        await updateDoc(userRef, {
+          emailVerified: true
+        });
+      }
+
+      const profileRef = doc(db, "users", user.uid, "profile", "profileInfo");
+      const profileSnap = await getDoc(profileRef);
+      const profileData = profileSnap.exists()
+        ? profileSnap.data()
+        : { name: "", photoURL: "" };
+
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", userData.role);
+      localStorage.setItem("profile", JSON.stringify(profileData));
+
+      set({
+        user,
+        token,
+        role: userData.role,
+        profile: profileData,
+        error: null,
       });
 
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-
-        const profileRef = doc(db, "users", user.uid, "profile", "profileInfo");
-        const profileSnap = await getDoc(profileRef);
-        const profileData = profileSnap.exists()
-          ? profileSnap.data()
-          : { name: "", photoURL: "" };
-
-        localStorage.setItem("user", JSON.stringify(user));
-        localStorage.setItem("token", token);
-        localStorage.setItem("role", userData.role);
-        localStorage.setItem("profile", JSON.stringify(profileData));
-
-        set({
-          user,
-          token,
-          role: userData.role,
-          profile: profileData,
-          error: null,
-        });
-
-        if (userData.role === 'admin') {
-          navigation('/dashboard');
-        } else {
-          navigation('/');
-        }
+      if (userData.role === 'admin') {
+        navigation('/dashboard');
       } else {
-        throw new Error("User role not found.");
+        navigation('/');
       }
     } catch (err) {
       let errorMessage = "An error occurred during login";
